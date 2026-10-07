@@ -12,8 +12,9 @@
    1. `db/schema.sql`
    2. `db/policies.sql`
    3. `db/revoke-direct.sql`
-2. 마지막 `db/revoke-direct.sql`은 `training_notes`의 `PUBLIC`, `anon`, `authenticated` 직접 권한을 거두고 지정된 소유자별 정책을 정리합니다. RLS는 켜 둡니다. `service_role` 권한은 변경하지 않으므로 서버 함수의 메모 접근은 유지됩니다.
-3. Vercel 프로젝트의 **Settings → Environment Variables**에서 `SUPABASE_URL`과 서버 전용 `SUPABASE_SECRET_KEY`를 직접 입력하세요. 비밀값은 코드나 문서에 기록하지 마세요. `/api/auth`는 서버에서 Supabase Auth REST를 호출하며 공개 키를 사용합니다.
+2. `db/revoke-direct.sql`은 `public.training_notes`에서만 `PUBLIC`, `anon`, `authenticated`의 직접 테이블 권한을 회수합니다. 이 파일은 다른 테이블, RLS 설정·정책, `service_role` 권한을 변경하지 않습니다.
+3. `db/revoke-direct.sql`의 `REVOKE` 앞 확인 쿼리 결과와 뒤 확인 쿼리 결과를 비교하세요. 뒤 결과에서 `anon`과 `authenticated`의 `can_select`, `can_insert`, `can_update`, `can_delete`는 모두 `false`여야 합니다. ACL 확인 결과에는 `PUBLIC`, `anon`, `authenticated` 권한이 없어야 하고, `service_role` 결과는 적용 전과 같아야 합니다. 역할 멤버십 등으로 간접 권한을 추가했다면 유효 권한 결과가 달라질 수 있으므로 따로 검토하세요.
+4. Vercel 프로젝트의 **Settings → Environment Variables**에서 `SUPABASE_URL`과 서버 전용 `SUPABASE_SECRET_KEY`를 직접 입력하세요. 비밀값은 코드나 문서에 기록하지 마세요. `/api/auth`는 서버에서 Supabase Auth REST를 호출하며 공개 키를 사용합니다.
 
 ## 남은 약점
 
@@ -51,4 +52,4 @@ git grep -n -F '<가상 메모 문장 하나>' origin/HEAD -- .
 
 **과거 노출 주의:** 새 배포에서 `/data.json`이 404이고 최신 커밋 검색에 결과가 없더라도, 옛 공개 커밋이나 옛 배포가 남아 있는 한 과거 노출이 해소됐다고 판단하지 마세요. 위 확인만으로 Git 이력이나 이전 배포가 삭제되지는 않습니다.
 
-**남은 약점(4단계 기준):** 로그인과 본인 메모 검사는 서버에서 하지만, 서버 함수는 아직 서버 전용 키로 DB에 직접 접근합니다. 이 점검은 `/data.json`이 404인지, 최신 파일에 메모 문장이 없는지만 확인할 뿐 API 권한 검사의 증거는 아닙니다.
+**남은 약점(현재 구현 기준):** 로그인과 소유자 검사는 서버 함수가 수행하며, 서버 함수는 계속 서버 전용 키로 DB에 접근합니다. 이 점검은 `/data.json`이 404인지, 최신 파일에 메모 문장이 없는지만 확인할 뿐 API 권한 검사의 증거는 아닙니다.
