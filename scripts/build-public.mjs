@@ -15,9 +15,9 @@ if (config.step === 1) {
   }
   await copyFile(source, output);
   console.log('실습용 공개 자료를 public/data.json에 복사했습니다.');
-} else if (config.step === 2) {
+} else if (config.step >= 2) {
   await rm(output, { force: true });
-  console.log('2단계에서는 공개 data.json을 배포하지 않습니다.');
+  console.log('2단계 이상에서는 공개 data.json을 배포하지 않습니다.');
 } else {
   throw new Error(`지원하지 않는 단계입니다: ${config.step}`);
 }
