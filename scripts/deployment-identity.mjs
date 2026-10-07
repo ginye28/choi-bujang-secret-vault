@@ -24,6 +24,27 @@ export function deploymentIdentity(env, config) {
     && config.allowedRoutes.every((route) => typeof route === 'string' && route.length > 0 && route.length <= 120)
     ? config.allowedRoutes
     : [];
+  let originalApiUrl = null;
+  if (typeof config.originalApiUrl === 'string'
+      && config.originalApiUrl.startsWith('https://')
+      && config.originalApiUrl.length <= 300) {
+    try {
+      const parsed = new URL(config.originalApiUrl);
+      const authority = config.originalApiUrl.match(/^https:\/\/([^/?#]*)/u)?.[1] ?? '';
+      if (parsed.protocol === 'https:'
+          && parsed.username === ''
+          && parsed.password === ''
+          && !authority.includes('@')
+          && parsed.search === ''
+          && parsed.hash === ''
+          && !config.originalApiUrl.includes('?')
+          && !config.originalApiUrl.includes('#')) {
+        originalApiUrl = config.originalApiUrl;
+      }
+    } catch {
+      // Invalid URLs are omitted from the deployment identity.
+    }
+  }
   return {
     schema: 'aleph.defense.deployment.v1',
     step: config.step,
@@ -33,5 +54,6 @@ export function deploymentIdentity(env, config) {
     judgeIssuer: config.judgeIssuer,
     sampleMarker: config.sampleMarker,
     allowedRoutes,
+    originalApiUrl,
   };
 }
