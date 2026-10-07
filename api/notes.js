@@ -101,6 +101,7 @@ export default async function handler(request, response) {
         .from('training_notes')
         .select('id, title, content')
         .eq('id', id)
+        .eq('owner_id', identity.userId)
         .maybeSingle();
       if (error) return response.status(500).json({ error: 'NOTES_SERVICE_UNAVAILABLE' });
       if (!data) return response.status(404).json({ error: 'NOT_FOUND' });
@@ -125,6 +126,9 @@ export default async function handler(request, response) {
         })
         .select('id')
         .single();
+      if (error?.code === '23505') {
+        return response.status(409).json({ error: 'CONFLICT' });
+      }
       if (error || !data) {
         return response.status(500).json({ error: 'NOTES_SERVICE_UNAVAILABLE' });
       }
@@ -138,6 +142,7 @@ export default async function handler(request, response) {
         .from('training_notes')
         .update({ title: body.title, content: body.body })
         .eq('id', id)
+        .eq('owner_id', identity.userId)
         .select('id')
         .maybeSingle();
       if (error) return response.status(500).json({ error: 'NOTES_SERVICE_UNAVAILABLE' });
@@ -150,6 +155,7 @@ export default async function handler(request, response) {
         .from('training_notes')
         .delete()
         .eq('id', id)
+        .eq('owner_id', identity.userId)
         .select('id')
         .maybeSingle();
       if (error) return response.status(500).json({ error: 'NOTES_SERVICE_UNAVAILABLE' });
