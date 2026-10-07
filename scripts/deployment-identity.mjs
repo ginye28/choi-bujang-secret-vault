@@ -18,6 +18,12 @@ export function deploymentIdentity(env, config) {
       || !/^[A-Z0-9_]{1,80}$/u.test(config.sampleMarker)) {
     throw new Error('배포 식별 정보를 확인할 수 없습니다. Vercel 시스템 환경변수와 1단계 시작 틀을 확인하세요.');
   }
+  const allowedRoutes = Array.isArray(config.allowedRoutes)
+    && config.allowedRoutes.length > 0
+    && config.allowedRoutes.length <= 20
+    && config.allowedRoutes.every((route) => typeof route === 'string' && route.length > 0 && route.length <= 120)
+    ? config.allowedRoutes
+    : [];
   return {
     schema: 'aleph.defense.deployment.v1',
     step: config.step,
@@ -26,5 +32,6 @@ export function deploymentIdentity(env, config) {
     publicAppUrl: `https://${host.toLowerCase()}`,
     judgeIssuer: config.judgeIssuer,
     sampleMarker: config.sampleMarker,
+    allowedRoutes,
   };
 }

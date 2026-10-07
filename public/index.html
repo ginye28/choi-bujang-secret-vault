@@ -71,12 +71,6 @@
     <p id="status" role="status" aria-live="polite"></p>
   </main>
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
-    const supabase = createClient(
-      'https://ldtrdbdsxzppjwnvbdgf.supabase.co',
-      'sb_publishable_amnYNFLw-nOpHU0iCIaXrQ_drb3gIzL'
-    );
     const loginView = document.querySelector('#login-view');
     const signedInView = document.querySelector('#signed-in-view');
     const authForm = document.querySelector('#auth-form');
@@ -85,6 +79,8 @@
     const notesStatus = document.querySelector('#notes-status');
     const notesList = document.querySelector('#notes-list');
     const buttons = [...document.querySelectorAll('button')];
+    const TOKEN_KEY = 'access_token';
+    const EMAIL_KEY = 'user_email';
     let notesRequestId = 0;
 
     function showMessage(message = '', isError = false) {
@@ -97,10 +93,21 @@
       notesStatus.dataset.error = String(isError);
     }
 
+    async function authRequest(action, email, password) {
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, email, password })
+      });
+      let result;
+      try { result = await response.json(); } catch { result = null; }
+      if (!response.ok) throw new Error(result?.message || '인증 요청을 완료하지 못했습니다.');
+      return result;
+    }
+
     async function notesRequest(path, options = {}) {
-      const { data, error } = await supabase.auth.getSession();
-      const accessToken = data?.session?.access_token;
-      if (error || !accessToken) throw new Error(error?.message || '로그인 토큰을 확인할 수 없습니다.');
+      const accessToken = sessionStorage.getItem(TOKEN_KEY);
+      if (!accessToken) throw new Error('로그인이 필요합니다.');
       const response = await fetch(path, {
         ...options,
         headers: {
@@ -219,12 +226,12 @@
       buttons.forEach(button => { button.disabled = isBusy; });
     }
 
-    function renderUser(user) {
-      const isSignedIn = Boolean(user);
+    function renderUser(email) {
+      const isSignedIn = Boolean(sessionStorage.getItem(TOKEN_KEY));
       loginView.hidden = isSignedIn;
       signedInView.hidden = !isSignedIn;
       if (isSignedIn) {
-        document.querySelector('#signed-in-email').textContent = user.email || '이메일 정보 없음';
+        document.querySelector('#signed-in-email').textContent = email || '이메일 정보 없음';
         passwordInput.value = '';
         window.setTimeout(() => {
           if (!loginView.hidden) return;
@@ -237,24 +244,26 @@
       }
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      renderUser(session?.user ?? null);
-    });
-    window.addEventListener('pagehide', () => subscription.unsubscribe(), { once: true });
-
     authForm.addEventListener('submit', async event => {
       event.preventDefault();
       setBusy(true);
       showMessage();
       try {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: document.querySelector('#email').value.trim(),
-          password: passwordInput.value
-        });
-        if (error) showMessage(error.message, true);
+        const result = await authRequest(
+          'login',
+          document.querySelector('#email').value.trim(),
+          passwordInput.value
+        );
+        if (typeof result?.access_token !== 'string' || !result.access_token) {
+          throw new Error('로그인 응답을 확인할 수 없습니다.');
+        }
+        sessionStorage.setItem(TOKEN_KEY, result.access_token);
+        sessionStorage.setItem(EMAIL_KEY, result.email || '');
+        renderUser(result.email);
       } catch (error) {
         showMessage(error.message || '로그인 요청을 완료하지 못했습니다.', true);
       } finally {
+        passwordInput.value = '';
         setBusy(false);
       }
     });
@@ -264,30 +273,30 @@
       setBusy(true);
       showMessage();
       try {
-        const { data, error } = await supabase.auth.signUp({
-          email: document.querySelector('#email').value.trim(),
-          password: passwordInput.value
-        });
-        if (error) showMessage(error.message, true);
-        else if (!data.session) showMessage('가입 요청이 완료되었습니다. 이메일 확인을 마친 뒤 로그인해 주세요.');
+        const result = await authRequest(
+          'signup',
+          document.querySelector('#email').value.trim(),
+          passwordInput.value
+        );
+        if (typeof result?.access_token === 'string' && result.access_token) {
+          sessionStorage.setItem(TOKEN_KEY, result.access_token);
+          sessionStorage.setItem(EMAIL_KEY, result.email || '');
+          renderUser(result.email);
+        } else {
+          showMessage('가입 요청이 완료되었습니다. 이메일 확인을 마친 뒤 로그인해 주세요.');
+        }
       } catch (error) {
         showMessage(error.message || '회원가입 요청을 완료하지 못했습니다.', true);
       } finally {
+        passwordInput.value = '';
         setBusy(false);
       }
     });
 
-    document.querySelector('#logout-button').addEventListener('click', async () => {
-      setBusy(true);
-      showMessage();
-      try {
-        const { error } = await supabase.auth.signOut();
-        if (error) showMessage(error.message, true);
-      } catch (error) {
-        showMessage(error.message || '로그아웃 요청을 완료하지 못했습니다.', true);
-      } finally {
-        setBusy(false);
-      }
+    document.querySelector('#logout-button').addEventListener('click', () => {
+      sessionStorage.clear();
+      renderUser(null);
+      showMessage('로그아웃했습니다.');
     });
 
     document.querySelector('#add-note-form').addEventListener('submit', async event => {
@@ -309,6 +318,12 @@
         setBusy(false);
       }
     });
+
+    if (sessionStorage.getItem(TOKEN_KEY)) {
+      renderUser(sessionStorage.getItem(EMAIL_KEY));
+    } else {
+      renderUser(null);
+    }
   </script>
 </body>
 </html>

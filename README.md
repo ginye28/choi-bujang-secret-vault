@@ -1,23 +1,27 @@
-# 자료실 — 4단계 저장점
+# 자료실 — 5단계 저장점
 
 ## 현재 기능
 
-- Supabase 이메일 로그인으로 사용자를 인증합니다.
-- 서버가 요청 토큰을 검증하고, 확인된 사용자 ID로 메모 소유자를 판별합니다.
-- 본인 메모만 읽기·추가·수정·삭제할 수 있습니다. 다른 사용자의 메모는 없는 메모와 똑같이 `404 {"error":"NOT_FOUND"}`로 응답합니다.
+- 브라우저는 로그인·회원가입을 `/api/auth`, 메모 조회·추가·수정·삭제를 `/api/notes` 서버 함수에 요청하며 Supabase를 직접 호출하지 않습니다. 화면 코드에는 Supabase 키가 없습니다.
+- `/api/auth`가 서버에서 Supabase Auth에 인증 요청을 전달하고, 성공한 로그인 토큰은 브라우저의 `sessionStorage`에 저장됩니다. `/api/notes` 요청은 이 토큰을 Bearer 인증으로 전달합니다. 로그아웃하면 브라우저 저장소를 비웁니다.
+- `/api/notes`는 로그인 사용자를 확인한 뒤 서버에서 `training_notes`를 조회·변경하고, 메모 소유자 조건을 적용합니다. 다른 사용자의 메모는 `404 {"error":"NOT_FOUND"}`로 응답합니다.
 
 ## 다시 실행하기
 
-1. Supabase **SQL Editor**에서 `db/schema.sql`을 실행하고, 이어서 `db/policies.sql`을 실행합니다.
-2. 선택 사항인 가상 메모 시드는 로컬 `db/seed.local.sql`에 있습니다. 필요한 경우 검토 후 로컬 학습 DB에 사용하세요.
-3. Vercel 프로젝트의 **Settings → Environment Variables**에서 `SUPABASE_URL`과 `SUPABASE_SECRET_KEY`를 직접 입력하세요. 비밀값을 코드나 README에 기록하지 마세요.
+1. Supabase **SQL Editor**에서 아래 파일을 순서대로 실행하세요.
+   1. `db/schema.sql`
+   2. `db/policies.sql`
+   3. `db/revoke-direct.sql`
+2. 마지막 `db/revoke-direct.sql`은 `training_notes`의 `PUBLIC`, `anon`, `authenticated` 직접 권한을 거두고 지정된 소유자별 정책을 정리합니다. RLS는 켜 둡니다. `service_role` 권한은 변경하지 않으므로 서버 함수의 메모 접근은 유지됩니다.
+3. Vercel 프로젝트의 **Settings → Environment Variables**에서 `SUPABASE_URL`과 서버 전용 `SUPABASE_SECRET_KEY`를 직접 입력하세요. 비밀값은 코드나 문서에 기록하지 마세요. `/api/auth`는 서버에서 Supabase Auth REST를 호출하며 공개 키를 사용합니다.
 
 ## 남은 약점
 
-- 5단계 전이므로 앱 서버가 서버 전용 키로 DB에 직접 접근합니다. 키는 브라우저에 노출하지 말고 Vercel 환경변수로만 관리하세요.
-- 옛 공개 커밋과 배포에는 과거 노출 기록이 남아 있습니다. 현재 구현의 변경만으로 과거 기록이 사라지지는 않습니다.
+- 옛 공개 커밋과 배포에는 과거 노출 기록이 남아 있습니다. 현재 구현이나 새 배포만으로 과거 기록이 사라지지는 않습니다.
+- `/api/auth`에는 속도 제한이 없습니다.
+- 메모 API의 서버 전용 키는 Vercel의 `SUPABASE_SECRET_KEY` 환경변수 하나에 의존합니다. 이 값은 브라우저 코드에 넣지 마세요.
 
-SQL 실행, 환경변수 설정, 배포 및 동작 확인은 이 문서 수정 과정에서 수행하지 않았습니다.
+SQL 실행, 환경변수 설정, 배포 및 화면 동작 확인은 이 문서 수정 과정에서 수행하지 않았습니다.
 
 ## 2단계 확인 절차
 
