@@ -1,0 +1,30 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "web-injection",
+  "technique": {
+    "id": "T1190",
+    "name": "Exploit Public-Facing Application"
+  },
+  "patterns": [
+    {
+      "name": "요청 인자 내 SQL 구문",
+      "condition": "요청 인자에 SQL 구문이 포함된 요청이 반복해서 관찰된다.",
+      "evidence": "MITRE ATT&CK T1190은 외부 공개 앱 악용을 다루며, 연습 경보 wi-01·wi-04·wi-08은 SQL 구문이 이어진 요청의 반복을 기록한다."
+    },
+    {
+      "name": "반복 명령 구분자 표기",
+      "condition": "요청 설명 또는 인자에서 명령 구분자 표기가 반복되고, 경보의 반복 횟수와 함께 확인된다.",
+      "evidence": "MITRE ATT&CK T1190은 외부 공개 앱 악용을 다루며, 연습 경보 wi-06은 한 주소의 명령 구분자 표기가 11회 반복된 사례다."
+    },
+    {
+      "name": "요청 인자 내 스크립트 태그",
+      "condition": "요청 인자에 스크립트 태그 표기가 포함된 요청이 반복해서 관찰된다.",
+      "evidence": "MITRE ATT&CK T1190은 외부 공개 앱 악용을 다루며, 연습 경보 wi-02는 스크립트 삽입 표기의 반복을 기록한다."
+    },
+    {
+      "name": "반복 경로 거슬러 올라가기",
+      "condition": "요청 인자에 경로를 거슬러 올라가는 ../ 표기가 반복해서 포함된다.",
+      "evidence": "MITRE ATT&CK T1190은 외부 공개 앱 악용을 다루며, 연습 경보 wi-03·wi-07은 반복된 경로 이탈 표기를 기록한다."
+    }
+  ]
+}
