@@ -18,7 +18,7 @@
       "alertId": "bf-03",
       "action": "block",
       "confidence": 0.95,
-      "reason": "고위험 대량 로그인 실패 (T1110)"
+      "reason": "짧은 시간 같은 주소의 로그인 실패 연속"
     },
     {
       "alertId": "bf-04",
@@ -30,7 +30,7 @@
       "alertId": "bf-05",
       "action": "block",
       "confidence": 0.95,
-      "reason": "고위험 대량 로그인 실패 (T1110)"
+      "reason": "짧은 시간 같은 주소의 로그인 실패 연속"
     },
     {
       "alertId": "bf-06",
@@ -42,13 +42,13 @@
       "alertId": "bf-07",
       "action": "block",
       "confidence": 0.95,
-      "reason": "고위험 대량 로그인 실패 (T1110)"
+      "reason": "짧은 시간 같은 주소의 로그인 실패 연속"
     },
     {
       "alertId": "bf-08",
       "action": "block",
       "confidence": 0.95,
-      "reason": "고위험 대량 로그인 실패 (T1110)"
+      "reason": "짧은 시간 같은 주소의 로그인 실패 연속"
     },
     {
       "alertId": "bf-09",
@@ -60,7 +60,7 @@
       "alertId": "bf-10",
       "action": "block",
       "confidence": 0.95,
-      "reason": "고위험 대량 로그인 실패 (T1110)"
+      "reason": "짧은 시간 같은 주소의 로그인 실패 연속"
     },
     {
       "alertId": "bf-11",

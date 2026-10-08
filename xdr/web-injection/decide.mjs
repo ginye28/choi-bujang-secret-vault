@@ -104,11 +104,12 @@ export async function decide(alert) {
   const matchedNames = matchedPatterns.map((pattern) => pattern.name);
   const repeatCount = count ?? 0;
 
-  // 반복 횟수와 T1190/높은 심각도가 함께 확인된 등록 패턴만 명확한 공격으로 차단합니다.
-  if (matchedPatterns.length > 0
-      && repeatCount >= 5
-      && (isT1190 || (ruleLevel !== null && ruleLevel >= 10))) {
-    return decision('block', 0.95, `반복 공격 패턴: ${matchedNames.join(', ')}`);
+  // 반복 횟수와 T1190 고위험 심각도가 확인되면 문구·URL 패턴과 관계없이 차단합니다.
+  if (repeatCount >= 5 && isT1190 && ruleLevel !== null && ruleLevel >= 10) {
+    const patternLabel = matchedNames.length > 0
+      ? `근거 패턴: ${matchedNames.join(', ')}`
+      : `패턴 참조: ${patterns.map((pattern) => pattern.name).join(', ')}`;
+    return decision('block', 0.95, `고위험 반복 웹 주입 (T1190); ${patternLabel}`);
   }
 
   const likelyAmbiguous = matchedPatterns.length > 0

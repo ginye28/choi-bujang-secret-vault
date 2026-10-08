@@ -6,49 +6,49 @@
       "alertId": "wi-01",
       "action": "block",
       "confidence": 0.95,
-      "reason": "반복 공격 패턴: 요청 인자 내 SQL 구문"
+      "reason": "고위험 반복 웹 주입 (T1190); 근거 패턴: 요청 인자 내 SQL 구문"
     },
     {
       "alertId": "wi-02",
       "action": "block",
       "confidence": 0.95,
-      "reason": "반복 공격 패턴: 요청 인자 내 스크립트 태그"
+      "reason": "고위험 반복 웹 주입 (T1190); 근거 패턴: 요청 인자 내 스크립트 태그"
     },
     {
       "alertId": "wi-03",
       "action": "block",
       "confidence": 0.95,
-      "reason": "반복 공격 패턴: 반복 경로 거슬러 올라가기"
+      "reason": "고위험 반복 웹 주입 (T1190); 근거 패턴: 반복 경로 거슬러 올라가기"
     },
     {
       "alertId": "wi-04",
       "action": "block",
       "confidence": 0.95,
-      "reason": "반복 공격 패턴: 요청 인자 내 SQL 구문"
+      "reason": "고위험 반복 웹 주입 (T1190); 근거 패턴: 요청 인자 내 SQL 구문"
     },
     {
       "alertId": "wi-05",
       "action": "block",
       "confidence": 0.95,
-      "reason": "반복 공격 패턴: 요청 인자 내 SQL 구문, 요청 인자 내 스크립트 태그"
+      "reason": "고위험 반복 웹 주입 (T1190); 근거 패턴: 요청 인자 내 SQL 구문, 요청 인자 내 스크립트 태그"
     },
     {
       "alertId": "wi-06",
       "action": "block",
       "confidence": 0.95,
-      "reason": "반복 공격 패턴: 반복 명령 구분자 표기"
+      "reason": "고위험 반복 웹 주입 (T1190); 근거 패턴: 반복 명령 구분자 표기"
     },
     {
       "alertId": "wi-07",
       "action": "block",
       "confidence": 0.95,
-      "reason": "반복 공격 패턴: 반복 경로 거슬러 올라가기"
+      "reason": "고위험 반복 웹 주입 (T1190); 근거 패턴: 반복 경로 거슬러 올라가기"
     },
     {
       "alertId": "wi-08",
       "action": "block",
       "confidence": 0.95,
-      "reason": "반복 공격 패턴: 요청 인자 내 SQL 구문"
+      "reason": "고위험 반복 웹 주입 (T1190); 근거 패턴: 요청 인자 내 SQL 구문"
     },
     {
       "alertId": "wi-09",

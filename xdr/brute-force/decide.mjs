@@ -108,19 +108,12 @@ export async function decide(alert) {
   }
 
   const ruleLevel = alert?.rule?.level;
-  if (isT1110
-      && Number.isFinite(ruleLevel)
-      && ruleLevel >= 10
-      && count !== null
-      && count >= 20
-      && typeof sourceAddress === 'string'
-      && sourceAddress.length > 0
-      && /실패|대입|시도/.test(description)) {
+  if (isT1110 && Number.isFinite(ruleLevel) && ruleLevel >= 10) {
     const confidence = 0.95;
     return {
       action: actionFor(confidence),
       confidence,
-      reason: '고위험 대량 로그인 실패 (T1110)',
+      reason: shortWindowPattern.name,
     };
   }
 
