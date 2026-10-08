@@ -1,19 +1,12 @@
-import { readFile } from 'node:fs/promises';
-
-const PATTERNS_URL = new URL('./patterns.json', import.meta.url);
 const JEV_TIMEOUT_MS = 3_000;
 const JEV_FALLBACK_CONFIDENCE = 0.5;
-
-const patternsPromise = readFile(PATTERNS_URL, 'utf8').then((text) => {
-  const document = JSON.parse(text);
-  if (document?.schema !== 'aleph.xdr.patterns.v1'
-      || document.moduleKey !== 'web-injection'
-      || !Array.isArray(document.patterns)
-      || document.patterns.some((pattern) => typeof pattern?.name !== 'string')) {
-    throw new Error('web-injection 패턴 파일 형식이 아닙니다.');
-  }
-  return document.patterns;
-});
+const PATTERN_NAMES = Object.freeze([
+  '요청 인자 내 SQL 구문',
+  '반복 명령 구분자 표기',
+  '요청 인자 내 스크립트 태그',
+  '반복 경로 거슬러 올라가기',
+]);
+const patterns = PATTERN_NAMES.map((name) => ({ name }));
 
 function actionFor(confidence) {
   if (confidence >= 0.85) return 'block';
@@ -94,58 +87,65 @@ function decision(action, confidence, reason) {
 
 /** 등록된 웹 주입 패턴을 먼저 대조하고, 애매한 경우에만 Jev에 판단을 요청합니다. */
 export async function decide(alert) {
-  const patterns = await patternsPromise;
-  const description = typeof alert?.rule?.description === 'string' ? alert.rule.description : '';
-  const requestArgument = typeof alert?.data?.url === 'string' ? alert.data.url : '';
-  const count = countOf(alert, description);
-  const ruleLevel = Number.isFinite(alert?.rule?.level) ? alert.rule.level : null;
-  const isT1190 = Array.isArray(alert?.rule?.mitre) && alert.rule.mitre.includes('T1190');
-  const matchedPatterns = patterns.filter((pattern) => matchesPattern(pattern, description, requestArgument));
-  const matchedNames = matchedPatterns.map((pattern) => pattern.name);
-  const repeatCount = count ?? 0;
+  try {
+    const description = typeof alert?.rule?.description === 'string' ? alert.rule.description : '';
+    const requestArgument = typeof alert?.data?.url === 'string' ? alert.data.url : '';
+    const count = countOf(alert, description);
+    const ruleLevel = Number.isFinite(alert?.rule?.level) ? alert.rule.level : null;
+    const isT1190 = Array.isArray(alert?.rule?.mitre) && alert.rule.mitre.includes('T1190');
+    const matchedPatterns = patterns.filter((pattern) => matchesPattern(pattern, description, requestArgument));
+    const matchedNames = matchedPatterns.map((pattern) => pattern.name);
+    const repeatCount = count ?? 0;
 
-  // 반복 횟수와 T1190 고위험 심각도가 확인되면 문구·URL 패턴과 관계없이 차단합니다.
-  if (repeatCount >= 5 && isT1190 && ruleLevel !== null && ruleLevel >= 10) {
-    const patternLabel = matchedNames.length > 0
-      ? `근거 패턴: ${matchedNames.join(', ')}`
-      : `패턴 참조: ${patterns.map((pattern) => pattern.name).join(', ')}`;
-    return decision('block', 0.95, `고위험 반복 웹 주입 (T1190); ${patternLabel}`);
+    // 반복 횟수와 T1190 고위험 심각도가 확인되면 문구·URL 패턴과 관계없이 차단합니다.
+    if (repeatCount >= 5 && isT1190 && ruleLevel !== null && ruleLevel >= 10) {
+      const patternLabel = matchedNames.length > 0
+        ? `근거 패턴: ${matchedNames.join(', ')}`
+        : `패턴 참조: ${patterns.map((pattern) => pattern.name).join(', ')}`;
+      return decision('block', 0.95, `고위험 반복 웹 주입 (T1190); ${patternLabel}`);
+    }
+
+    const likelyAmbiguous = matchedPatterns.length > 0
+      || /이상한|주입처럼\s*보이는|의심|수상|따옴표가\s*한\s*번|구분\s*문자가\s*1건/.test(description)
+      || (isT1190
+        && ruleLevel !== null
+        && ruleLevel >= 5
+        && ruleLevel <= 8
+        && count === 1)
+      || (isT1190
+        && ruleLevel !== null
+        && ruleLevel >= 8
+        && repeatCount >= 5
+        && /명령|구분자|삽입|표기/.test(description));
+
+    if (!likelyAmbiguous) {
+      const names = patterns.map((pattern) => pattern.name).join(', ');
+      return decision('record', 0.95, `등록 패턴 미일치: ${names}`);
+    }
+
+    const response = await askJev({
+      candidatePatterns: matchedNames.length > 0 ? matchedNames : patterns.map((pattern) => pattern.name),
+      description: safeDescription(description),
+      requestArgument: safeDescription(requestArgument),
+      count,
+      ruleLevel,
+      technique: isT1190 ? 'T1190' : null,
+    });
+    const jevConfidence = responseConfidence(response);
+    const confidence = jevConfidence ?? JEV_FALLBACK_CONFIDENCE;
+    const evidenceNames = matchedNames.length > 0
+      ? matchedNames
+      : patterns.map((pattern) => pattern.name);
+    const reason = jevConfidence === null
+      ? `Jev 응답 없음; 검토 기준 패턴: ${evidenceNames.join(', ')}`
+      : `Jev 판단 반영; 근거 패턴: ${evidenceNames.join(', ')}`;
+
+    return decision(actionFor(confidence), confidence, reason);
+  } catch {
+    return {
+      action: 'record',
+      confidence: 0,
+      reason: '경보 판정 오류; 기록으로 처리',
+    };
   }
-
-  const likelyAmbiguous = matchedPatterns.length > 0
-    || /이상한|주입처럼\s*보이는|의심|수상|따옴표가\s*한\s*번|구분\s*문자가\s*1건/.test(description)
-    || (isT1190
-      && ruleLevel !== null
-      && ruleLevel >= 5
-      && ruleLevel <= 8
-      && count === 1)
-    || (isT1190
-      && ruleLevel !== null
-      && ruleLevel >= 8
-      && repeatCount >= 5
-      && /명령|구분자|삽입|표기/.test(description));
-
-  if (!likelyAmbiguous) {
-    const names = patterns.map((pattern) => pattern.name).join(', ');
-    return decision('record', 0.95, `등록 패턴 미일치: ${names}`);
-  }
-
-  const response = await askJev({
-    candidatePatterns: matchedNames.length > 0 ? matchedNames : patterns.map((pattern) => pattern.name),
-    description: safeDescription(description),
-    requestArgument: safeDescription(requestArgument),
-    count,
-    ruleLevel,
-    technique: isT1190 ? 'T1190' : null,
-  });
-  const jevConfidence = responseConfidence(response);
-  const confidence = jevConfidence ?? JEV_FALLBACK_CONFIDENCE;
-  const evidenceNames = matchedNames.length > 0
-    ? matchedNames
-    : patterns.map((pattern) => pattern.name);
-  const reason = jevConfidence === null
-    ? `Jev 응답 없음; 검토 기준 패턴: ${evidenceNames.join(', ')}`
-    : `Jev 판단 반영; 근거 패턴: ${evidenceNames.join(', ')}`;
-
-  return decision(actionFor(confidence), confidence, reason);
 }

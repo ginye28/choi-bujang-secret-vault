@@ -1,16 +1,7 @@
-import { readFile } from 'node:fs/promises';
-
-const PATTERNS_URL = new URL('./patterns.json', import.meta.url);
 const JEV_TIMEOUT_MS = 3_000;
 const FALLBACK_CONFIDENCE = 0.5;
-
-const patternsPromise = readFile(PATTERNS_URL, 'utf8').then((text) => {
-  const document = JSON.parse(text);
-  if (document?.moduleKey !== 'brute-force' || !Array.isArray(document.patterns)) {
-    throw new Error('brute-force 패턴 파일 형식이 아닙니다.');
-  }
-  return document.patterns;
-});
+const SHORT_WINDOW_PATTERN_NAME = '짧은 시간 같은 주소의 로그인 실패 연속';
+const PASSWORD_SPRAY_PATTERN_NAME = '여러 계정에 같은 비밀번호 대입';
 
 function toCount(value) {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -80,9 +71,7 @@ function responseConfidence(response) {
 }
 
 /** 경보의 두 무차별 대입 패턴을 대조하고, 애매한 경우에만 Jev 어댑터에 질의합니다. */
-export async function decide(alert) {
-  const patterns = await patternsPromise;
-  const [shortWindowPattern, passwordSprayPattern] = patterns;
+async function decideInternal(alert) {
   const description = typeof alert?.rule?.description === 'string' ? alert.rule.description : '';
   const data = alert?.data ?? {};
   const count = failedCount(description, data);
@@ -94,7 +83,7 @@ export async function decide(alert) {
     return {
       action: actionFor(confidence),
       confidence,
-      reason: passwordSprayPattern.name,
+      reason: PASSWORD_SPRAY_PATTERN_NAME,
     };
   }
 
@@ -103,7 +92,7 @@ export async function decide(alert) {
     return {
       action: actionFor(confidence),
       confidence,
-      reason: shortWindowPattern.name,
+      reason: SHORT_WINDOW_PATTERN_NAME,
     };
   }
 
@@ -113,7 +102,7 @@ export async function decide(alert) {
     return {
       action: actionFor(confidence),
       confidence,
-      reason: shortWindowPattern.name,
+      reason: SHORT_WINDOW_PATTERN_NAME,
     };
   }
 
@@ -124,7 +113,7 @@ export async function decide(alert) {
     return {
       action: 'record',
       confidence: 0.95,
-      reason: `패턴 미일치: ${shortWindowPattern.name}`,
+      reason: `패턴 미일치: ${SHORT_WINDOW_PATTERN_NAME}`,
     };
   }
 
@@ -133,13 +122,15 @@ export async function decide(alert) {
     return {
       action: 'record',
       confidence: 0.95,
-      reason: `패턴 미일치: ${shortWindowPattern.name}`,
+      reason: `패턴 미일치: ${SHORT_WINDOW_PATTERN_NAME}`,
     };
   }
 
-  const pattern = multipleAccounts(alert, description) ? passwordSprayPattern : shortWindowPattern;
+  const pattern = multipleAccounts(alert, description)
+    ? PASSWORD_SPRAY_PATTERN_NAME
+    : SHORT_WINDOW_PATTERN_NAME;
   const response = await askJev({
-    pattern: pattern.name,
+    pattern,
     timestamp: typeof alert?.timestamp === 'string' ? alert.timestamp : null,
     ruleLevel: Number.isFinite(alert?.rule?.level) ? alert.rule.level : null,
     description: safeDescription(description),
@@ -156,7 +147,20 @@ export async function decide(alert) {
     action: actionFor(confidence),
     confidence,
     reason: jevConfidence === null
-      ? `Jev 응답 없음; 근거 패턴: ${pattern.name}`
-      : `Jev 확신도 반영; 근거 패턴: ${pattern.name}`,
+      ? `Jev 응답 없음; 근거 패턴: ${pattern}`
+      : `Jev 확신도 반영; 근거 패턴: ${pattern}`,
   };
+}
+
+/** 어떤 입력에서도 유효한 판정 객체를 반환합니다. */
+export async function decide(alert) {
+  try {
+    return await decideInternal(alert);
+  } catch {
+    return {
+      action: 'record',
+      confidence: 0,
+      reason: '경보 판정 오류; 기록으로 처리',
+    };
+  }
 }
