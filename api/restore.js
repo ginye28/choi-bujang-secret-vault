@@ -46,6 +46,12 @@ export default async function handler(request, response) {
     return response.status(500).json({ error: 'SERVER_NOT_CONFIGURED' });
   }
 
+  await writeDiag(currentServices.supabase, '00000000-0000-4000-8000-000000000000', {
+    at: new Date().toISOString(), route: 'restore-entry', method: request.method, url: String(request.url).slice(0, 80),
+    type: String(request.headers?.['content-type'] ?? '').slice(0, 40), body: describeValue(request.body),
+    auth: typeof request.headers?.authorization === 'string' ? 'bearer' : 'none',
+  });
+
   let identity;
   try {
     identity = await currentServices.verifyLogin(request.headers?.authorization);
