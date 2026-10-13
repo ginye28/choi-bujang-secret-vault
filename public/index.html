@@ -128,7 +128,7 @@
     </section>
     <section id="checks-panel" aria-labelledby="checks-heading">
       <h2 id="checks-heading" style="margin-top:0">탈환 작전실 · 제출 점검 기록</h2>
-      <p>아래 수치는 <code>GET /api/checks</code> 응답(커밋된 가린 점검 기록 <code>docs/check-record.json</code>)에서 센 값만 표시합니다. 요청 주소와 메모 본문은 기록하지 않습니다.</p>
+      <p>아래 수치는 <code>GET /api/checks</code> 응답에서 센 값만 표시합니다. 근거는 방금 만든 제출 묶음(<code>artifacts/submission.json</code>)이 있으면 그것, 없으면 커밋된 가린 점검 기록(<code>docs/check-record.json</code>)입니다. 요청 주소와 메모 본문은 기록하지 않습니다.</p>
       <p id="checks-summary" role="status" aria-live="polite">제출 점검 기록을 불러오는 중입니다.</p>
       <ul id="checks-list"></ul>
       <p id="checks-judge"></p>
@@ -401,7 +401,7 @@
     function checksSummaryText(checks) {
       if (!checks?.available) return '제출 점검 기록이 없습니다(미실행). 수치를 채우지 않습니다.';
       const counts = checks.counts;
-      return `제출 점검 기록: 점검 항목 ${counts.total}건 · 막은 공격 ${counts.blocked}건 · 뚫린 공격 ${counts.breached}건 · 실행하지 않은 점검 ${counts.notRun}건 · 기록 시각 ${checks.checkedAt}`;
+      return `제출 점검 기록(${checks.source ?? '출처 없음'}): 점검 항목 ${counts.total}건 · 막은 공격 ${counts.blocked}건 · 뚫린 공격 ${counts.breached}건 · 실행하지 않은 점검 ${counts.notRun}건 · 기록 시각 ${checks.checkedAt ?? '기록 없음'}`;
     }
 
     async function loadPublicChecks() {

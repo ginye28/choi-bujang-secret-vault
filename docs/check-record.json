@@ -1,6 +1,6 @@
 {
   "schema": "aleph.check.record.v1",
-  "checkedAt": "2026-10-13T07:34:16.406Z",
+  "checkedAt": "2026-10-13T07:40:18.620Z",
   "note": "npm run checks:record 로 실제 배포에 보낸 읽기 요청의 관측 값입니다. 심판의 41종 시험 결과가 아닙니다.",
   "attempts": [
     {
@@ -39,9 +39,9 @@
       "observed": "HTTP 401; method=GET"
     },
     {
-      "attackId": "direct_original_api_denied",
-      "expected": "키 없는 원본 API 요청은 자료를 반환하지 않고 HTTP 401 또는 403",
-      "observed": "HTTP 401; method=GET"
+      "attackId": "original_table_path_not_exposed",
+      "expected": "배포 주소에서 원본 표 경로 GET /rest/v1/training_notes는 HTTP 404",
+      "observed": "HTTP 404; method=GET"
     }
   ]
 }

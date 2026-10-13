@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 // 12단계 제출 묶음은 읽기(GET·HEAD) 요청만 보낼 수 있습니다. 쓰기 요청 점검은 여기에 두지 않습니다.
+// 모든 점검은 배포 주소(publicAppUrl)로만 보냅니다. 격리 환경에서 닿지 않는 외부 주소를 섞으면
+// 같은 점검이 환경에 따라 미실행이 되어 화면 수치와 실행 기록이 어긋나기 때문입니다.
+// (키 없는 원본 API 직접 요청은 scripts/verify-all.mjs --deployed 의 배포 점검 표에 따로 남깁니다.)
 function publicApp(config) {
   let app;
   try {
@@ -25,7 +28,7 @@ export const BLOCKED_STATUS = Object.freeze({
   anonymous_restore_route_rejected: [401],
   anonymous_ops_room_rejected: [401],
   installed_marker_without_login_rejected: [401],
-  direct_original_api_denied: [401, 403],
+  original_table_path_not_exposed: [404],
 });
 
 export const NOT_RUN = 'not_run';
@@ -145,29 +148,11 @@ export async function runAttackChecks(input) {
     await requestObservation(new URL('/api/notes', app), { headers: { 'x-aleph-app': 'installed' } }, 'installed_marker_without_login_rejected'),
   ));
 
-  if (!config.originalApiUrl) {
-    results.push(attackResult(
-      'direct_original_api_denied',
-      '키 없는 원본 API 요청은 자료를 반환하지 않고 HTTP 401 또는 403',
-      NOT_RUN,
-    ));
-  } else {
-    let originalApi;
-    try {
-      originalApi = new URL(config.originalApiUrl);
-    } catch {
-      throw new Error('aleph.config.json의 원본 API 주소가 올바르지 않습니다.');
-    }
-    if (originalApi.protocol !== 'https:' || originalApi.username || originalApi.password
-        || originalApi.search || originalApi.hash) {
-      throw new Error('aleph.config.json의 원본 API 주소가 올바르지 않습니다.');
-    }
-    results.push(attackResult(
-      'direct_original_api_denied',
-      '키 없는 원본 API 요청은 자료를 반환하지 않고 HTTP 401 또는 403',
-      await requestObservation(originalApi, {}, 'direct_original_api_denied'),
-    ));
-  }
+  results.push(attackResult(
+    'original_table_path_not_exposed',
+    '배포 주소에서 원본 표 경로 GET /rest/v1/training_notes는 HTTP 404',
+    await requestObservation(new URL('/rest/v1/training_notes', app), {}, 'original_table_path_not_exposed'),
+  ));
 
   return results;
 }

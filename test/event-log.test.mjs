@@ -154,6 +154,7 @@ test('제출 묶음 점검은 읽기 요청만 보내고 alephEvidence 로 점�
       step: 12, publicAppUrl: 'https://student-defense.vercel.app/', originalApiUrl: 'https://db.example.org/rest/v1/notes',
     });
     assert.equal(seen.length, results.length);
+    assert.ok(seen.every(({ url }) => url.startsWith('https://student-defense.vercel.app/')), '배포 주소로만 보냄');
     results.forEach((result, index) => {
       const { init, url } = seen[index];
       assert.deepEqual(init.alephEvidence, { caseId: result.attackId, requestKey: 'read' });
@@ -161,7 +162,7 @@ test('제출 묶음 점검은 읽기 요청만 보내고 alephEvidence 로 점�
       const headerNames = Object.keys(init.headers ?? {}).map((name) => name.toLowerCase());
       assert.equal(headerNames.some((name) => name.includes('attack') || name === 'x-request-id'), false);
       assert.equal(url.includes(result.attackId), false);
-      assert.equal(result.observed, 'HTTP 401; method=GET');
+      assert.match(result.observed, /^HTTP 401; method=GET$/u);
     });
     globalThis.fetch = async () => { throw new TypeError('network blocked'); };
     const offline = await runAttackChecks('https://student-defense.vercel.app/');

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { classifyAttempt } from './attack-check.mjs';
 
 // 12단계 제출 점검 기록: `npm run checks:record` 가 src/attack-check.mjs 를 실제 배포에 실행한 결과를
@@ -11,10 +12,33 @@ const ID = /^[a-z0-9][a-z0-9_.-]{0,79}$/iu;
 
 const text = (value, max) => (typeof value === 'string' ? value.slice(0, max).replace(/[\u0000-\u001f\u007f]/gu, ' ') : '');
 
+// 화면 수치의 근거가 되는 기록을 읽습니다.
+// 1) 같은 폴더에서 방금 만든 제출 묶음(artifacts/submission.json, npm run bundle 결과)이 있으면 그 점검 결과를,
+// 2) 없으면(배포 환경 등) 커밋된 docs/check-record.json 을 씁니다. 둘 다 없으면 빈 기록입니다.
+// 경로는 배포 함수 묶음에 파일이 함께 실리도록 문자열 그대로 둡니다.
+export function loadCheckRecord({
+  bundleUrl = new URL('../artifacts/submission.json', import.meta.url),
+  recordUrl = new URL('../docs/check-record.json', import.meta.url),
+} = {}) {
+  try {
+    const bundle = JSON.parse(readFileSync(bundleUrl, 'utf8'));
+    if (bundle?.schema === 'aleph.defense.submission.v2' && Array.isArray(bundle.attackAttempts)) {
+      return { ...buildCheckRecord(bundle.attackAttempts, { checkedAt: null }), source: 'artifacts/submission.json' };
+    }
+  } catch {
+    // 제출 묶음이 없으면 커밋된 기록을 봅니다.
+  }
+  try {
+    return { ...JSON.parse(readFileSync(recordUrl, 'utf8')), source: 'docs/check-record.json' };
+  } catch {
+    return null;
+  }
+}
+
 export function buildCheckRecord(attempts, { checkedAt = new Date() } = {}) {
   return {
     schema: CHECK_RECORD_SCHEMA,
-    checkedAt: checkedAt.toISOString(),
+    checkedAt: checkedAt ? checkedAt.toISOString() : null,
     note: 'npm run checks:record 로 실제 배포에 보낸 읽기 요청의 관측 값입니다. 심판의 41종 시험 결과가 아닙니다.',
     attempts: attempts.map(({ attackId, expected, observed }) => ({ attackId, expected, observed })),
   };
@@ -39,7 +63,8 @@ export function summarizeCheckRecord(record) {
   }
   return {
     available: rows.length > 0,
-    checkedAt: rows.length > 0 ? text(record.checkedAt, 40) : null,
+    checkedAt: rows.length > 0 ? text(record.checkedAt, 40) || null : null,
+    source: rows.length > 0 ? text(record.source, 40) || null : null,
     counts,
     rows,
     // 심판의 41종 시험 결과는 이 기록에 없습니다. 막음·통과로 세지 않고 미실행으로만 둡니다.

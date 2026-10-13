@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { BLOCKED_STATUS, classifyAttempt, runAttackChecks } from '../src/attack-check.mjs';
-import { buildCheckRecord, summarizeCheckRecord } from '../src/check-record.mjs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { buildCheckRecord, loadCheckRecord, summarizeCheckRecord } from '../src/check-record.mjs';
 import { buildOpsReport, runLocalChecks } from '../src/ops-room.mjs';
 import checksHandler from '../api/checks.js';
 
@@ -19,7 +23,7 @@ test('기록의 수치는 점검을 하나씩 센 값이고 합이 점검 수와
   const record = buildCheckRecord([
     { attackId: 'public_data_json_gone', expected: 'HTTP 404', observed: 'HTTP 404; method=GET' },
     { attackId: 'anonymous_notes_list_rejected', expected: 'HTTP 401', observed: 'HTTP 200; method=GET' },
-    { attackId: 'direct_original_api_denied', expected: 'HTTP 401', observed: 'not_run' },
+    { attackId: 'original_table_path_not_exposed', expected: 'HTTP 404', observed: 'not_run' },
   ], { checkedAt: new Date('2026-10-13T00:00:00Z') });
   const summary = summarizeCheckRecord(record);
   assert.deepEqual(summary.counts, { total: 3, blocked: 1, breached: 1, notRun: 1 });
@@ -45,15 +49,37 @@ test('커밋된 기록은 제출 점검과 같은 점검 이름을 담고, /api/
   });
   assert.equal(status, 200);
   assert.equal(headers['Cache-Control'], 'no-store');
-  assert.deepEqual(body.counts, summarizeCheckRecord(record).counts);
-  const report = buildOpsReport({ rows: await runLocalChecks(), recovery: [], devices: [], checkRecord: record });
+  assert.deepEqual(body.counts, summarizeCheckRecord(loadCheckRecord()).counts);
+  const report = buildOpsReport({ rows: await runLocalChecks(), recovery: [], devices: [], checkRecord: loadCheckRecord() });
   assert.deepEqual(report.checks.counts, body.counts);
+});
+
+test('방금 만든 제출 묶음이 있으면 그 결과(미실행 포함)로 세고, 없으면 커밋된 기록을 쓴다', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'checks-'));
+  const base = { bundleUrl: pathToFileURL(join(dir, 'artifacts', 'submission.json')), recordUrl: pathToFileURL(join(dir, 'docs', 'check-record.json')) };
+  assert.equal(loadCheckRecord(base), null);
+  mkdirSync(join(dir, 'docs'));
+  writeFileSync(join(dir, 'docs', 'check-record.json'), JSON.stringify(buildCheckRecord([
+    { attackId: 'public_data_json_gone', expected: 'HTTP 404', observed: 'HTTP 404; method=GET' },
+  ])));
+  assert.equal(loadCheckRecord(base).source, 'docs/check-record.json');
+  mkdirSync(join(dir, 'artifacts'));
+  writeFileSync(join(dir, 'artifacts', 'submission.json'), JSON.stringify({
+    schema: 'aleph.defense.submission.v2',
+    attackAttempts: [
+      { attackId: 'public_data_json_gone', expected: 'HTTP 404', observed: 'HTTP 404; method=GET' },
+      { attackId: 'original_table_path_not_exposed', expected: 'HTTP 404', observed: 'not_run' },
+    ],
+  }));
+  const summary = summarizeCheckRecord(loadCheckRecord(base));
+  assert.equal(summary.source, 'artifacts/submission.json');
+  assert.deepEqual(summary.counts, { total: 2, blocked: 1, breached: 0, notRun: 1 });
 });
 
 test('제출 점검 기록과 같은 응답을 받으면 같은 결과가 나온다', async () => {
   const originalFetch = globalThis.fetch;
   try {
-    globalThis.fetch = async (url) => new Response('{}', { status: String(url).endsWith('/data.json') ? 404 : 401 });
+    globalThis.fetch = async (url) => new Response('{}', { status: /\/data\.json$|\/rest\/v1\//u.test(String(url)) ? 404 : 401 });
     const attempts = await runAttackChecks({
       step: 12, publicAppUrl: 'https://student-defense.vercel.app/', originalApiUrl: 'https://db.example.org/rest/v1/notes',
     });

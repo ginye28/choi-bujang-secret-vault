@@ -6,6 +6,7 @@ import { checkDeviceProof, createDeviceStore } from '../src/device-proof.mjs';
 import { BACKUP_PREFIX } from '../src/note-backup.mjs';
 import { buildOpsReport, runLocalChecks } from '../src/ops-room.mjs';
 import { actorRef, readEvents, summarizeEvents } from '../src/event-log.mjs';
+import { loadCheckRecord } from '../src/check-record.mjs';
 
 let services;
 
@@ -35,15 +36,6 @@ function readDeployedRows() {
     return Array.isArray(log.deployedRows) ? log.deployedRows.slice(0, 40) : [];
   } catch {
     return [];
-  }
-}
-
-// 커밋된 제출 점검 기록(docs/check-record.json). /api/checks 와 같은 파일입니다.
-function readCheckRecord() {
-  try {
-    return JSON.parse(readFileSync(new URL('../docs/check-record.json', import.meta.url), 'utf8'));
-  } catch {
-    return null;
   }
 }
 
@@ -98,7 +90,7 @@ async function handler(request, response) {
       events = { ...summarizeEvents([]), available: false };
     }
     return response.status(200).json(buildOpsReport({
-      rows, deployedRows: readDeployedRows(), recovery: data, devices, events, checkRecord: readCheckRecord(),
+      rows, deployedRows: readDeployedRows(), recovery: data, devices, events, checkRecord: loadCheckRecord(),
     }));
   } catch {
     return response.status(500).json({ error: 'OPS_SERVICE_UNAVAILABLE' });
