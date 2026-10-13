@@ -29,12 +29,25 @@ test('자기 메모 읽기·수정은 허용된다', async () => {
     ['POST', '/notes', 'POST /notes'],
     ['GET', `/notes/${NOTE_ID}`, 'GET /notes/:id'],
     ['PUT', `/notes/${NOTE_ID}`, 'PUT /notes/:id'],
-    ['DELETE', `/notes/${NOTE_ID}`, 'DELETE /notes/:id'],
     ['GET', '/notes/demo', 'GET /notes/:id'],
   ]) {
     const out = await outcome(request(method, path, route));
     assert.equal(out.decision, 'allow', `${route} ${path}`);
     assert.ok(out.ruleIds.every((id) => RULE_IDS.includes(id)));
+  }
+});
+
+test('삭제와, 쿼리가 붙은 자료 경로는 구역 규칙이 열지 않는다', async () => {
+  const del = await outcome(request('DELETE', `/notes/${NOTE_ID}`, 'DELETE /notes/:id'));
+  assert.deepEqual([del.decision, del.reasonCode], ['deny', 'route_not_allowed']);
+
+  for (const [method, path, route] of [
+    ['GET', `/notes/${NOTE_ID}`, 'GET /notes/:id'],
+    ['GET', '/notes', 'GET /notes'],
+    ['PUT', `/notes/${NOTE_ID}`, 'PUT /notes/:id'],
+  ]) {
+    const out = await outcome(request(method, path, route, { queryLength: 14 }));
+    assert.deepEqual([out.decision, out.reasonCode], ['deny', 'query_not_allowed'], `${route} ?query`);
   }
 });
 

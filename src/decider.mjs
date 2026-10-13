@@ -99,7 +99,8 @@ function validEngineRequest(request) {
 const ZONES = Object.freeze({
   notes: {
     collection: '/notes', item: '/notes/:id',
-    methods: { '/notes': ['GET', 'POST'], '/notes/:id': ['GET', 'PUT', 'DELETE'] },
+    // 8단계는 자기 메모 읽기·수정만 구역으로 허용합니다. 삭제는 구역 규칙에서 열지 않습니다.
+    methods: { '/notes': ['GET', 'POST'], '/notes/:id': ['GET', 'PUT'] },
   },
   announcements: {
     collection: '/announcements', item: '/announcements/:id',
@@ -173,6 +174,12 @@ function zoneDecision(request) {
   if (WRITE_METHODS.includes(request.method) && rawId !== null
       && containsAnnouncementMarker(rawId)) {
     return { allow: false, reasonCode: 'announcement_write_denied', ruleId: RULE_IDS[3] };
+  }
+
+  // 쿼리로 기능이나 자료를 고르지 않습니다. 판정 계약에는 쿼리 원문이 없고 길이만 있으므로,
+  // 자료 경로에 쿼리가 붙은 요청은 어느 구역을 가리키는지 확인할 수 없어 거부합니다.
+  if (request.queryLength > 0) {
+    return { allow: false, reasonCode: 'query_not_allowed', ruleId: RULE_IDS[2] };
   }
 
   const hit = matchZone(request);
