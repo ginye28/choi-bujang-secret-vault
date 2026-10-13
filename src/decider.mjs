@@ -10,6 +10,8 @@ const STEP_UP_KEYS = 'authAgeSeconds,verified';
 const EVENT_KEYS = 'ageSeconds,count,kind';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const UTC_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?Z$/u;
+// 12단계: 엔진이 회수했다고 알린 신원·기기는 다시 보내도 열지 않습니다(사건 종류 이름만 봅니다).
+const REVOKED_EVENT_KINDS = new Set(['identity_revoked', 'access_revoked', 'session_revoked', 'device_revoked']);
 const MANY_READS_THRESHOLD = 10;
 const RECENT_EVENT_SECONDS = 300;
 
@@ -255,7 +257,9 @@ export async function decide(request) {
   if (!validEngineRequest(request)) throw new TypeError('invalid_decision_request');
 
   // 6단계 기기 규칙: 미등록 기기는 구역과 관계없이 먼저 거부합니다.
-  if (!request.deviceRegistered) {
+  // 12단계: 회수된 신원의 재전송도 같은 규칙·이유 코드로 먼저 거부합니다.
+  const revoked = request.recentEvents.some((event) => REVOKED_EVENT_KINDS.has(event.kind) && event.count >= 1);
+  if (!request.deviceRegistered || revoked) {
     return {
       schema: 'aleph.decision.v1',
       requestId: request.requestId,

@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
-import { describeRequest, writeDiag } from '../src/diag-log.mjs';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { hasStoredInstructorPermission } from '../src/instructor-access.mjs';
 import {
@@ -56,8 +55,6 @@ export default async function handler(request, response) {
   } catch {
     return response.status(500).json({ error: 'SERVER_NOT_CONFIGURED' });
   }
-
-  await writeDiag(currentServices.supabase, describeRequest(request, { route: 'device' }));
 
   let identity;
   try {

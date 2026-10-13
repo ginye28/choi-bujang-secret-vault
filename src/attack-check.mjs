@@ -87,6 +87,22 @@ export async function runAttackChecks(config) {
     }),
   ));
 
+  results.push(attackResult(
+    'anonymous_restore_rejected',
+    '인증 헤더 없는 POST /api/restore는 HTTP 401',
+    await requestObservation(new URL('/api/restore', app), { method: 'POST' }),
+  ));
+  results.push(attackResult(
+    'anonymous_ops_room_rejected',
+    '인증 헤더 없는 GET /api/ops는 HTTP 401 및 JSON 응답',
+    await requestObservation(new URL('/api/ops', app)),
+  ));
+  results.push(attackResult(
+    'installed_marker_without_login_rejected',
+    '설치 표시만 붙인 로그인 없는 GET /api/notes는 HTTP 401',
+    await requestObservation(new URL('/api/notes', app), { headers: { 'x-aleph-app': 'installed' } }),
+  ));
+
   if (!config.originalApiUrl) {
     results.push(attackResult(
       'direct_original_api_denied',

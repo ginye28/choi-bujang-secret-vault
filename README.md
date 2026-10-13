@@ -1,4 +1,36 @@
-# 자료실 — 11단계 저장점
+# 자료실 — 12단계 저장점
+
+## 12단계: 탈환 작전실 — 1~11단계를 한 곳에서 확인합니다
+
+검사한 커밋은 배포 주소의 `/aleph.json` 의 `commit` 과 `git log -1` 이 같은 커밋입니다. 아래 내용은 그 커밋의 파일 기준입니다.
+
+### 무엇이 있는가
+- **탈환 작전실 화면**: 로그인 뒤 "탈환 작전실" 패널의 "작전실 요약 불러오기" 버튼. 판정기 규칙 이름, 탐지 규칙(burst_read), 내 기기 승인·대기 수, 복구 버전(사본 개수·가린 메모 번호·내용 해시), 점검 결과 표를 보여 줍니다. 화면의 수치는 `GET /api/ops` 응답 값만 씁니다. 메모 제목과 본문은 받지도 표시하지도 않습니다.
+- **`GET /api/ops`** (`api/ops.js`): 로그인과 11단계 기기 서명을 확인한 뒤, 서버가 그 순간 판정기·탐지·정책 사본·기기 서명 코드를 직접 호출한 점검 결과(`src/ops-room.mjs`)와 내 복구 버전·기기 상태의 숫자만 돌려줍니다.
+- **점검 기록**: `npm run verify:all`(코드 직접 호출)과 `node scripts/verify-all.mjs --deployed`(배포 주소에 로그인 없이 보내는 요청)가 `docs/verification-log.json` 과 `docs/VERIFICATION.md` 를 만듭니다. 항목마다 기대 결과·실제 결과·요청 ID·확인 시각·상태를 한 표에 둡니다.
+- **판정기 보강**: 엔진이 `identity_revoked`·`access_revoked`·`session_revoked`·`device_revoked` 사건을 알린 신원은 같은 요청을 다시 보내도 `device_not_registered` 로 먼저 거부합니다.
+
+### 실행·미실행 구분
+- **실행·일치 / 실행·불일치**: 위 점검이 실제로 호출해서 얻은 결과입니다. 요청 ID는 판정 요청의 UUID, 배포 요청의 `x-vercel-id`, 또는 `local:` 표시입니다.
+- **미실행**: 로그인 토큰이 필요한 배포 API 호출, 운영 자료를 바꾸는 `POST /api/restore` 실호출, 운영 엔진의 사건 전달·접속 회수, 실제 기기 설치는 이 환경에서 실행하지 않았습니다. 표의 "미실행" 목록에 이유와 함께 남겼고 통과로 세지 않습니다.
+- **심판의 41종 시험**: 운영 측이 실행하는 시험입니다. 이 문서의 점검은 학생이 직접 실행한 것만 세며 41종의 통과를 대신하지 않습니다.
+
+### 총공세에서 확인한 세 가지 (모두 `test/ops-room.test.mjs` 와 작전실 표에 실행 결과로 남김)
+1. 같은 제출본에서 자기 메모 조회 뒤 다른 사용자 메모 조회 → 앞 요청의 허용이 뒤 요청에 이어지지 않고 `zone_other_owner` 로 거부.
+2. 미등록 기기 요청 뒤 회수된 신원의 재전송 → 두 요청 모두 `device_not_registered` 로 거부.
+3. 복구 뒤 서명 없는 변경 요청과 구역 밖 조회 → 변경은 `SIGNATURE_MISSING`, 조회는 `deny`.
+
+### 설치·실행·중지·복구
+1. 설치: `npm ci` (Node 22 이상).
+2. 시험: `node --test test/*.test.mjs` — 시작 틀의 "패키징 함수 기준표" 시험 한 건은 이 작업과 무관하게 실패합니다.
+3. 점검 기록: `npm run verify:all` 또는 `node scripts/verify-all.mjs --deployed`.
+4. 실행: Vercel 에 push 하면 자동 배포됩니다. 환경 변수는 `SUPABASE_URL`, `SUPABASE_SECRET_KEY` 이며 값은 저장소에 두지 않습니다.
+5. 중지: 문제가 생기면 Vercel 대시보드에서 직전 배포로 되돌리거나 `git revert <커밋>` 후 push 합니다. `git reset --hard` 는 쓰지 않습니다.
+6. 복구: 메모 한 건은 `POST /api/restore`(10단계), 정책은 `npm run policy:diff` 로 차이를 본 뒤 `npm run policy:restore -- --confirm`.
+
+### 출처 구분
+- **ALEPH SDP 엔진 사용(제공)**: 요청 검증·릴레이·판정 요청 계약(`aleph.decision.v1`)·로그인 발급자·심판 접수. 이 저장소는 이를 호출·사용할 뿐 수정하지 않습니다.
+- **학생 작업**: `src/decider.mjs`(판정기), `src/detect.mjs`(탐지), `src/device-proof.mjs`(기기 서명), `src/note-backup.mjs`·`src/restore-note.mjs`·`src/policy.mjs`(복구), `src/ops-room.mjs`·`api/ops.js`·`public/index.html`(작전실), `xdr/`(XDR 보너스), `test/`.
 
 ## 11단계: 나만의 접속 앱을 완성합니다
 

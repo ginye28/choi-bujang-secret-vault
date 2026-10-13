@@ -40,6 +40,13 @@
     #device-panel { margin-top: 20px; padding: 14px; border: 1px solid #40566f; border-radius: 12px; background: #142235; }
     #device-state { font-weight: 700; }
     #device-note { margin: 8px 0 0; font-size: 14px; }
+    #ops-panel { margin-top: 20px; padding: 14px; border: 1px solid #40566f; border-radius: 12px; background: #142235; }
+    #ops-panel h3 { margin: 16px 0 6px; color: #8ad8df; }
+    #ops-panel p, #ops-panel li { overflow-wrap: anywhere; }
+    #ops-table-wrap { overflow-x: auto; }
+    #ops-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    #ops-table th, #ops-table td { padding: 6px 8px; border: 1px solid #40566f; text-align: left; vertical-align: top; }
+    .ops-notrun { color: #ffe0a8; }
   </style>
 </head>
 <body>
@@ -72,6 +79,29 @@
           <button id="device-refresh-button" class="secondary" type="button" hidden>상태 다시 확인</button>
         </div>
         <p id="device-note">앱을 설치했다는 표시나 이 버튼만으로는 기기 확인이 끝나지 않습니다. 서버가 이 기기를 등록 기기로 확인한 뒤에만 자료가 열립니다. 요청 서명에 쓰는 정보는 이 화면의 메모리에서만 쓰이고 저장되지 않습니다.</p>
+      </section>
+      <section id="ops-panel" aria-labelledby="ops-heading">
+        <h2 id="ops-heading" style="margin-top:0">탈환 작전실</h2>
+        <p id="ops-note">판정기 규칙, 탐지 사건, 회수 상태, 복구 버전의 요약입니다. 서버가 실제로 실행한 점검만 "실행"으로 표시하고, 실행하지 못한 점검은 "미실행"으로 구분합니다. 메모 제목과 본문은 표시하지 않습니다.</p>
+        <div class="actions"><button id="ops-open-button" type="button">작전실 요약 불러오기</button></div>
+        <p id="ops-status" role="status" aria-live="polite"></p>
+        <div id="ops-body" hidden>
+          <h3>판정기 규칙</h3>
+          <p id="ops-rules"></p>
+          <h3>탐지 사건</h3>
+          <p id="ops-detection"></p>
+          <h3>회수 상태</h3>
+          <p id="ops-revocation"></p>
+          <h3>복구 버전</h3>
+          <p id="ops-recovery"></p>
+          <ul id="ops-versions"></ul>
+          <h3>점검 결과</h3>
+          <p id="ops-verification"></p>
+          <div id="ops-table-wrap"><table id="ops-table"><thead><tr><th>단계</th><th>시험</th><th>기대</th><th>실제</th><th>요청 ID</th><th>확인 시각</th><th>상태</th></tr></thead><tbody></tbody></table></div>
+          <h3>미실행</h3>
+          <ul id="ops-pending"></ul>
+          <p id="ops-judge"></p>
+        </div>
       </section>
       <section id="notes-section" aria-labelledby="notes-heading" hidden>
         <h2 id="notes-heading">내 가상 메모</h2>
@@ -349,6 +379,68 @@
       }
     }
 
+    // 탈환 작전실: 화면의 모든 수치는 /api/ops 응답 값을 그대로 씁니다. 메모 본문은 받지도 않습니다.
+    function opsText(selector, text) {
+      document.querySelector(selector).textContent = text;
+    }
+
+    function opsCell(row, text, className) {
+      const cell = document.createElement('td');
+      cell.textContent = String(text);
+      if (className) cell.className = className;
+      row.append(cell);
+    }
+
+    function renderOps(report) {
+      const rules = report.rules;
+      opsText('#ops-rules', `규칙 ${rules.ruleIds.length}개: ${rules.ruleIds.join(', ')} · 이유 코드: ${rules.reasonCodes.join(', ')} · 안전 정책 ${rules.policyVersion ?? '확인 실패'}`);
+      const detection = report.detection;
+      opsText('#ops-detection', `${detection.rule}: ${detection.windowMinutes}분 안에 같은 사용자 읽기 ${detection.threshold}건 초과 시 회수 제안 · 표본 점검: ${detection.sample ? `${detection.sample.status} (${detection.sample.actual})` : '없음'} · 운영 엔진 연결: ${detection.engineConnected ? '연결' : '미실행'}`);
+      const revocation = report.revocation;
+      opsText('#ops-revocation', `내 기기 ${revocation.total}대 — 승인 ${revocation.approved}, 대기 ${revocation.pending}, 기타 ${revocation.other} · 엔진의 실제 접속 회수: ${revocation.engineRevocation}`);
+      const recovery = report.recovery;
+      opsText('#ops-recovery', `사본 ${recovery.versionCount}개 · 메모 ${recovery.noteCount}건 · 정책 사본 ${recovery.policyCopy.ok ? `정상 (${recovery.policyCopy.version}, ${recovery.policyCopy.sha256})` : '검증 실패'}`);
+      const versions = document.querySelector('#ops-versions');
+      versions.replaceChildren();
+      for (const version of recovery.versions) {
+        const item = document.createElement('li');
+        item.textContent = `${version.noteRef} · 해시 ${version.sha16} · ${version.savedAt ?? '시각 없음'}`;
+        versions.append(item);
+      }
+      const verification = report.verification;
+      opsText('#ops-verification', `실행 ${verification.executed}건 중 일치 ${verification.matched}건, 불일치 ${verification.mismatched}건 · 미실행 ${verification.notRun}건 · 확인 ${report.generatedAt}`);
+      const body = document.querySelector('#ops-table tbody');
+      body.replaceChildren();
+      for (const item of verification.rows) {
+        const row = document.createElement('tr');
+        for (const value of [item.stage, item.scenario, item.expected, item.actual, item.requestId, item.checkedAt, item.status]) opsCell(row, value);
+        body.append(row);
+      }
+      const pending = document.querySelector('#ops-pending');
+      pending.replaceChildren();
+      for (const item of verification.pending) {
+        const entry = document.createElement('li');
+        entry.className = 'ops-notrun';
+        entry.textContent = `${item.status} · ${item.stage}단계 · ${item.scenario} — ${item.reason}`;
+        pending.append(entry);
+      }
+      opsText('#ops-judge', report.judgeSuite.note);
+      document.querySelector('#ops-body').hidden = false;
+    }
+
+    async function openOps() {
+      opsText('#ops-status', '작전실 요약을 불러오는 중입니다.');
+      try {
+        const report = await notesRequest('/api/ops');
+        if (report?.schema !== 'aleph.ops.report.v1') throw new Error('작전실 응답 형식을 확인할 수 없습니다.');
+        renderOps(report);
+        opsText('#ops-status', '작전실 요약을 불러왔습니다.');
+      } catch (error) {
+        document.querySelector('#ops-body').hidden = true;
+        opsText('#ops-status', error.message || '작전실 요약을 불러오지 못했습니다.');
+      }
+    }
+
     function setBusy(isBusy) {
       buttons.forEach(button => { button.disabled = isBusy; });
     }
@@ -363,6 +455,8 @@
         device = null;
         applyDeviceStatus('unknown');
       } else {
+        document.querySelector('#ops-body').hidden = true;
+        opsText('#ops-status', '');
         notesRequestId += 1;
         device = null;
         notesList.replaceChildren();
@@ -419,6 +513,8 @@
         setBusy(false);
       }
     });
+
+    document.querySelector('#ops-open-button').addEventListener('click', openOps);
 
     document.querySelector('#logout-button').addEventListener('click', () => {
       session.token = '';
