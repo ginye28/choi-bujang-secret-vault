@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BYTE BACK | 자료실</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#1a2a3d">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <style>
     :root { color-scheme: dark; font-family: system-ui, sans-serif; }
     body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #101a28; color: #ecf4ff; }
@@ -32,11 +35,17 @@
     #notes-list p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
     .note-actions { margin-top: 14px; }
     .edit-form { margin-top: 8px; }
+    #offline-note { display: none; padding: 10px 12px; border: 1px solid #bd9f71; border-radius: 10px; color: #ffe0a8; }
+    #offline-note[data-offline="true"] { display: block; }
+    #device-panel { margin-top: 20px; padding: 14px; border: 1px solid #40566f; border-radius: 12px; background: #142235; }
+    #device-state { font-weight: 700; }
+    #device-note { margin: 8px 0 0; font-size: 14px; }
   </style>
 </head>
 <body>
   <main>
     <div class="eyebrow">BYTE BACK · 자료실</div>
+    <p id="offline-note" role="status" data-offline="false">오프라인입니다. 보호 자료는 서버가 기기를 확인한 뒤에만 열리므로 오프라인에서는 표시되지 않습니다.</p>
     <h1>이메일 로그인</h1>
     <section id="login-view" aria-label="이메일 로그인">
       <p>이메일과 비밀번호로 로그인하거나 새 계정을 만드세요.</p>
@@ -55,7 +64,16 @@
       <p>로그인된 이메일</p>
       <p id="signed-in-email"></p>
       <button id="logout-button" class="secondary" type="button">로그아웃</button>
-      <section aria-labelledby="notes-heading">
+      <section id="device-panel" aria-labelledby="device-heading">
+        <h2 id="device-heading" style="margin-top:0">기기 승인 상태</h2>
+        <p id="device-state" role="status" aria-live="polite">확인 전</p>
+        <div class="actions">
+          <button id="device-request-button" type="button">이 기기 승인 요청</button>
+          <button id="device-refresh-button" class="secondary" type="button" hidden>상태 다시 확인</button>
+        </div>
+        <p id="device-note">앱을 설치했다는 표시나 이 버튼만으로는 기기 확인이 끝나지 않습니다. 서버가 이 기기를 등록 기기로 확인한 뒤에만 자료가 열립니다. 기기 키는 이 화면의 메모리에만 있고 브라우저 저장소에 저장하지 않습니다.</p>
+      </section>
+      <section id="notes-section" aria-labelledby="notes-heading" hidden>
         <h2 id="notes-heading">내 가상 메모</h2>
         <form id="add-note-form">
           <label for="new-title">제목</label>
@@ -83,6 +101,124 @@
     const EMAIL_KEY = 'user_email';
     let notesRequestId = 0;
 
+    // 기기 키쌍은 메모리에서만 만들고 저장하지 않습니다(새로고침하면 다시 승인 요청). 비공개 키는 꺼낼 수 없게 만듭니다.
+    const deviceState = document.querySelector('#device-state');
+    const deviceRequestButton = document.querySelector('#device-request-button');
+    const deviceRefreshButton = document.querySelector('#device-refresh-button');
+    const notesSection = document.querySelector('#notes-section');
+    const offlineNote = document.querySelector('#offline-note');
+    let device = null; // { privateKey, deviceId, status }
+
+    function canonicalJson(value) {
+      if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']';
+      if (value !== null && typeof value === 'object') {
+        return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonicalJson(value[key])).join(',') + '}';
+      }
+      return JSON.stringify(value);
+    }
+
+    async function sha256Hex(text) {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+      return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+
+    function toBase64Url(buffer) {
+      let binary = '';
+      for (const byte of new Uint8Array(buffer)) binary += String.fromCharCode(byte);
+      return btoa(binary).replace(/[+]/g, '-').replace(/[/]/g, '_').replace(/=+$/, '');
+    }
+
+    // 방식·경로·본문 해시·시각·기기 번호를 묶어 서명합니다. 서명 뒤 경로나 본문이 바뀌면 서버가 거부합니다.
+    async function proofHeaders(method, path, bodyText) {
+      if (!device || device.status !== 'approved') return {};
+      const timestamp = Math.floor(Date.now() / 1000);
+      const bodyHash = await sha256Hex(bodyText ? canonicalJson(JSON.parse(bodyText)) : '');
+      const message = ['aleph-device-proof-v1', method.toUpperCase(), path, bodyHash, String(timestamp), device.deviceId].join('\n');
+      const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, device.privateKey, new TextEncoder().encode(message));
+      return {
+        'X-Aleph-App': 'installed', 'X-Aleph-Device': device.deviceId,
+        'X-Aleph-Ts': String(timestamp), 'X-Aleph-Sig': toBase64Url(signature)
+      };
+    }
+
+    function showDeviceState(text) {
+      deviceState.textContent = text;
+    }
+
+    function applyDeviceStatus(status) {
+      if (device) device.status = status;
+      const approved = status === 'approved';
+      notesSection.hidden = !approved;
+      deviceRefreshButton.hidden = approved || !device;
+      deviceRequestButton.hidden = Boolean(device);
+      if (approved) {
+        showDeviceState('승인됨 — 서버가 이 기기를 등록 기기로 확인했습니다.');
+        void loadNotes();
+      } else if (status === 'pending') {
+        showDeviceState('승인 대기 — 서버가 아직 이 기기를 확인하지 않았습니다. 자료는 표시되지 않습니다.');
+        notesList.replaceChildren();
+      } else {
+        showDeviceState('확인 전 — 기기 승인을 요청하세요. 승인 전에는 자료가 표시되지 않습니다.');
+        notesList.replaceChildren();
+      }
+    }
+
+    async function deviceApi(options) {
+      const accessToken = sessionStorage.getItem(TOKEN_KEY);
+      if (!accessToken) throw new Error('로그인이 필요합니다.');
+      const response = await fetch('/api/device' + (options.query || ''), {
+        method: options.method,
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+        body: options.body ? JSON.stringify(options.body) : undefined
+      });
+      let result;
+      try { result = await response.json(); } catch { result = null; }
+      if (!response.ok) throw new Error(result?.error || '기기 확인 요청 실패 (' + response.status + ')');
+      return result;
+    }
+
+    async function requestDeviceApproval() {
+      setBusy(true);
+      showDeviceState('서버에 승인을 요청하는 중입니다.');
+      try {
+        const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify']);
+        const jwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
+        const result = await deviceApi({
+          method: 'POST', body: { action: 'request', publicKey: { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y } }
+        });
+        device = { privateKey: pair.privateKey, deviceId: result.deviceId, status: result.status };
+        applyDeviceStatus(result.status);
+      } catch (error) {
+        device = null;
+        applyDeviceStatus('unknown');
+        showDeviceState('승인 요청을 완료하지 못했습니다: ' + (error.message || '알 수 없는 오류'));
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function refreshDeviceStatus() {
+      if (!device) return;
+      try {
+        const result = await deviceApi({ method: 'GET', query: '?deviceId=' + encodeURIComponent(device.deviceId) });
+        applyDeviceStatus(result.status);
+      } catch (error) {
+        showDeviceState('상태를 확인하지 못했습니다: ' + (error.message || '알 수 없는 오류'));
+      }
+    }
+
+    function updateOnlineState() {
+      offlineNote.dataset.offline = String(navigator.onLine === false);
+    }
+    window.addEventListener('online', updateOnlineState);
+    window.addEventListener('offline', updateOnlineState);
+    updateOnlineState();
+    deviceRequestButton.addEventListener('click', () => { void requestDeviceApproval(); });
+    deviceRefreshButton.addEventListener('click', () => { void refreshDeviceStatus(); });
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+
     function showMessage(message = '', isError = false) {
       status.textContent = message;
       status.dataset.error = String(isError);
@@ -108,12 +244,14 @@
     async function notesRequest(path, options = {}) {
       const accessToken = sessionStorage.getItem(TOKEN_KEY);
       if (!accessToken) throw new Error('로그인이 필요합니다.');
+      const proof = await proofHeaders(options.method || 'GET', path, options.body);
       const response = await fetch(path, {
         ...options,
         headers: {
           Accept: 'application/json',
           ...(options.body ? { 'Content-Type': 'application/json' } : {}),
           ...options.headers,
+          ...proof,
           Authorization: `Bearer ${accessToken}`
         }
       });
@@ -233,13 +371,13 @@
       if (isSignedIn) {
         document.querySelector('#signed-in-email').textContent = email || '이메일 정보 없음';
         passwordInput.value = '';
-        window.setTimeout(() => {
-          if (!loginView.hidden) return;
-          void loadNotes();
-        }, 0);
+        device = null;
+        applyDeviceStatus('unknown');
       } else {
         notesRequestId += 1;
+        device = null;
         notesList.replaceChildren();
+        notesSection.hidden = true;
         showNotesMessage();
       }
     }

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
+import { checkDeviceProof, createDeviceStore } from '../src/device-proof.mjs';
 import { hasStoredInstructorPermission } from '../src/instructor-access.mjs';
 import {
   announcementDatabaseId,
@@ -63,6 +64,14 @@ export default async function handler(request, response) {
   }
   if (!identity?.userId) {
     return response.status(401).json({ error: 'UNAUTHORIZED' });
+  }
+
+  // 설치형 앱 표시가 붙은 요청은 승인된 기기의 서명이 있어야 합니다(11단계).
+  const proof = await checkDeviceProof({
+    request, identity, loadDevice: (deviceId) => createDeviceStore(currentServices.supabase).load(deviceId),
+  });
+  if (proof.required && !proof.ok) {
+    return response.status(401).json({ error: 'DEVICE_PROOF_REQUIRED', reason: proof.reason });
   }
 
   // 공지는 로그인한 사용자 누구나 읽을 수 있습니다. 수정·등록·삭제는 서버에 저장된

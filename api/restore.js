@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { restoreNote } from '../src/restore-note.mjs';
+import { checkDeviceProof, createDeviceStore } from '../src/device-proof.mjs';
 
 let services;
 
@@ -53,6 +54,12 @@ export default async function handler(request, response) {
   }
   if (!identity?.userId) {
     return response.status(401).json({ error: 'UNAUTHORIZED', reason: 'LOGIN_REQUIRED' });
+  }
+  const proof = await checkDeviceProof({
+    request, identity, loadDevice: (deviceId) => createDeviceStore(currentServices.supabase).load(deviceId),
+  });
+  if (proof.required && !proof.ok) {
+    return response.status(401).json({ error: 'DEVICE_PROOF_REQUIRED', reason: proof.reason });
   }
   if (request.method !== 'POST') {
     response.setHeader('Allow', 'POST');
