@@ -252,9 +252,17 @@ function needsStepUp(request) {
 }
 
 export async function decide(request) {
-  // The contract carries engine-validated fields only. Reject unknown or
-  // malformed input rather than filling unavailable context with benign values.
-  if (!validEngineRequest(request)) throw new TypeError('invalid_decision_request');
+  // The contract carries engine-validated fields only. Unknown or malformed input is
+  // denied (never filled with benign values), but always with a well-formed 5-field response.
+  if (!validEngineRequest(request)) {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: typeof request?.requestId === 'string' ? request.requestId : null,
+      decision: 'deny',
+      reasonCode: 'route_not_allowed',
+      ruleIds: [RULE_IDS[2]],
+    };
+  }
 
   // 6단계 기기 규칙: 미등록 기기는 구역과 관계없이 먼저 거부합니다.
   // 12단계: 회수된 신원의 재전송도 같은 규칙·이유 코드로 먼저 거부합니다.
