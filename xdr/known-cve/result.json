@@ -6,49 +6,49 @@
       "alertId": "kc-01",
       "action": "block",
       "confidence": 0.95,
-      "reason": "jndi 원격 조회 구문"
+      "reason": "요청 머리글·인자의 JNDI 원격 조회 구문"
     },
     {
       "alertId": "kc-02",
       "action": "block",
       "confidence": 0.95,
-      "reason": "jndi 원격 조회 구문"
+      "reason": "요청 머리글·인자의 JNDI 원격 조회 구문"
     },
     {
       "alertId": "kc-03",
       "action": "block",
       "confidence": 0.98,
-      "reason": "jndi 원격 조회 구문"
+      "reason": "요청 머리글·인자의 JNDI 원격 조회 구문"
     },
     {
       "alertId": "kc-04",
       "action": "block",
       "confidence": 0.98,
-      "reason": "jndi 원격 조회 구문"
+      "reason": "요청 머리글·인자의 JNDI 원격 조회 구문"
     },
     {
       "alertId": "kc-05",
       "action": "block",
       "confidence": 0.95,
-      "reason": "jndi 원격 조회 구문"
+      "reason": "요청 머리글·인자의 JNDI 원격 조회 구문"
     },
     {
       "alertId": "kc-06",
       "action": "block",
       "confidence": 0.98,
-      "reason": "jndi 원격 조회 구문"
+      "reason": "요청 머리글·인자의 JNDI 원격 조회 구문"
     },
     {
       "alertId": "kc-07",
       "action": "block",
       "confidence": 0.95,
-      "reason": "jndi 원격 조회 구문"
+      "reason": "요청 머리글·인자의 JNDI 원격 조회 구문"
     },
     {
       "alertId": "kc-08",
       "action": "block",
       "confidence": 0.98,
-      "reason": "jndi 원격 조회 구문"
+      "reason": "요청 머리글·인자의 JNDI 원격 조회 구문"
     },
     {
       "alertId": "kc-09",

@@ -2,7 +2,7 @@
 // 심판은 이 파일 하나만 불러오므로 import 없이, 파일을 읽거나 쓰지 않고, 혼자 계산합니다.
 // patterns.json 의 패턴을 아래 상수로 옮겨 적었습니다.
 const PATTERNS = [
-  { name: 'jndi 원격 조회 구문', confidence: 0.95 },
+  { name: '요청 머리글·인자의 JNDI 원격 조회 구문', confidence: 0.95 },
   { name: '알려진 취약점 점검 도구의 흔적', confidence: 0.75 },
   { name: 'jndi 조회 구문 조각', confidence: 0.7 },
   { name: '취약점 이름 언급과 높은 경보 수준', confidence: 0.55 },
