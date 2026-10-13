@@ -1,0 +1,50 @@
+{
+  "policy": {
+    "device": {
+      "requireRegisteredDevice": true,
+      "onUnregistered": "deny"
+    },
+    "stepUp": {
+      "unusualHourBefore": 6,
+      "unusualHourFrom": 22,
+      "requireUnusualNetwork": true,
+      "riskEventCount": 10,
+      "riskWindowSeconds": 300,
+      "action": "step_up"
+    },
+    "zones": {
+      "notes": {
+        "/notes": [],
+        "/notes/:id": [
+          "GET"
+        ]
+      },
+      "announcements": {
+        "/announcements": [],
+        "/announcements/:id": []
+      }
+    },
+    "ownerRule": {
+      "referenceSubject": "learner_fixture",
+      "denyOtherSubjects": true,
+      "ownerMarkerPrefixes": [
+        "learner_",
+        "subject_",
+        "sub_",
+        "user_",
+        "student_"
+      ]
+    },
+    "unknownRoutes": "deny",
+    "query": "deny"
+  },
+  "otherServices": {
+    "ai": {
+      "dailyLimit": 20
+    },
+    "threatIntel": {
+      "source": "official-list"
+    }
+  },
+  "audit": []
+}

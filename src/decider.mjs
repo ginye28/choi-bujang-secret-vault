@@ -239,15 +239,14 @@ function zoneDecision(request) {
 
 function needsStepUp(request) {
   const { signals, recentEvents } = request;
-  const unusualHour = signals.hour < 6 || signals.hour >= 22;
   // Only the synthetic fixture's explicit 'unusual' label indicates a new network.
-  // Region is intentionally not part of this rule; 'none' signals are not evidence.
+  // Region and time are not independent triggers for this rule.
   const newNetwork = signals.source === 'judge_fixture' && signals.network === 'unusual';
   const suddenReadBurst = recentEvents.some((event) =>
     event.kind === 'risk_signal'
       && event.count >= MANY_READS_THRESHOLD
       && event.ageSeconds <= RECENT_EVENT_SECONDS);
-  return unusualHour && newNetwork && suddenReadBurst;
+  return newNetwork && suddenReadBurst;
 }
 
 export async function decide(request) {

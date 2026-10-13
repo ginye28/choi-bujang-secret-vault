@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { isNoteResourceId } from '../src/resource-ids.mjs';
-import { describeValue, writeDiag } from '../src/diag-log.mjs';
 import { BACKUP_LIKE, backupCurrentNote, isBackupTitle, recordBackup } from '../src/note-backup.mjs';
 
 let services;
@@ -72,25 +71,6 @@ function notFound(response) {
 }
 
 export default async function handler(request, response) {
-  // 응답을 보내면 함수가 멈출 수 있어, 변경 요청의 모양은 처리 전에 먼저 기록합니다.
-  await handleDiag(request);
-  return handleNotes(request, response);
-}
-
-async function handleDiag(request) {
-  try {
-    const { supabase } = getServices();
-    await writeDiag(supabase, '00000000-0000-4000-8000-000000000000', {
-      at: new Date().toISOString(), route: 'notes', method: request.method,
-      query: Object.keys(request.query ?? {}), body: describeValue(request.body),
-      auth: typeof request.headers?.authorization === 'string' ? 'bearer' : 'none',
-    });
-  } catch {
-    // 진단 기록 실패는 무시합니다.
-  }
-}
-
-async function handleNotes(request, response) {
   response.setHeader('Cache-Control', 'no-store');
 
   let currentServices;

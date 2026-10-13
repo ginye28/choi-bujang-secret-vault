@@ -1,25 +1,43 @@
+import { createHmac, randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { decide } from './decide.mjs';
 
-// 확인용 읽기 모듈입니다. decide.mjs 는 이 파일을 불러오지 않습니다.
-// 선택한 다섯 필드만 출력하고, 비밀값처럼 보이는 값이 섞인 텍스트 필드는 숨깁니다.
+// 읽기 전용 확인 모듈입니다. 출력에는 가명 사용자·기기, 유형, 판정만 남깁니다.
+// 가명 키는 이번 읽기 동안만 메모리에 있고, 원본 식별자나 다른 경보 필드는 기록하지 않습니다.
 const FIXTURE = new URL('../fixtures/exfiltration.json', import.meta.url);
-const REDACTED = '[비밀값 숨김]';
-const SECRET_LIKE_PATTERNS = [
-  /\b(?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|private[_-]?key|authorization|cookie|session[_-]?id)\b\s*["']?\s*[:=]\s*["']?[^\s,"'}`]+/i,
-  /\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/i,
-  /(?:비밀번호|비밀키|토큰|접근키)\s*[:=]\s*[^\s,"'}`]+/,
-  /\b(?:sk_(?:live|test)_|gh[pousr]_|glpat-|AKIA)[A-Za-z0-9_-]{8,}\b/,
-  /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_-]{5,})?\b/,
-];
+const ACTIONS = new Set(['block', 'alert', 'record']);
+const REQUEST_TYPES = Object.freeze({
+  '유출 흔적 없음': 'routine',
+  '처음 보는 목적지로 대용량 전송': 'data_transfer',
+  '업무 시간 밖 압축 파일 반출': 'after_hours_archive',
+});
 
-function safeText(value) {
-  if (typeof value !== 'string') return null;
-  const oneLine = value.replace(/[\t\r\n]+/g, ' ').trim();
-  return SECRET_LIKE_PATTERNS.some((pattern) => pattern.test(oneLine)) ? REDACTED : oneLine;
+function aliasFor(namespace, key) {
+  return (value) => {
+    if (typeof value !== 'string' || value.trim() === '') return `${namespace}-unavailable`;
+    // 매 호출마다 새 키를 써 원본 식별자를 보관하지 않으면서 같은 읽기 안에서는 연결합니다.
+    const digest = createHmac('sha256', key).update(value.trim(), 'utf8').digest('hex').slice(0, 16);
+    return `${namespace}-${digest}`;
+  };
 }
 
-/** 경보 묶음에서 시각·출발 주소·계정·규칙 수준·설명만 추려 반환합니다. */
+function safeRow(alert, pseudonymizeUser, pseudonymizeDevice) {
+  const result = decide(alert);
+  const action = ACTIONS.has(result?.action) ? result.action : 'record';
+  const requestType = Object.hasOwn(REQUEST_TYPES, result?.reason)
+    ? REQUEST_TYPES[result.reason]
+    : 'other';
+
+  return {
+    user: pseudonymizeUser(alert?.data?.srcuser),
+    device: pseudonymizeDevice(alert?.agent?.name),
+    requestType,
+    decision: action,
+  };
+}
+
+/** 가상 경보에서 승인된 네 항목만 뽑습니다. 원본 설명·주소·내용·토큰 등은 반환하지 않습니다. */
 export async function readAlerts(path = FIXTURE) {
   const fixture = JSON.parse(await readFile(path, 'utf8'));
   if (fixture?.schema !== 'aleph.xdr.fixture.v1'
@@ -28,30 +46,15 @@ export async function readAlerts(path = FIXTURE) {
     throw new Error('exfiltration 경보 묶음 형식이 아닙니다.');
   }
 
-  const rows = fixture.alerts.map((alert) => ({
-    timestamp: safeText(alert?.timestamp),
-    sourceAddress: safeText(alert?.data?.srcip),
-    account: safeText(alert?.data?.srcuser),
-    ruleLevel: Number.isFinite(alert?.rule?.level) ? alert.rule.level : null,
-    description: safeText(alert?.rule?.description),
-  }));
-
-  if (rows.length !== fixture.alerts.length) {
-    throw new Error('경보 건수와 추출한 줄 수가 일치하지 않습니다.');
-  }
-  return rows;
+  // 무작위 키는 요청 범위 안에서만 사용하며 디스크나 결과 객체에 쓰지 않습니다.
+  const userKey = randomBytes(32);
+  const deviceKey = randomBytes(32);
+  const pseudonymizeUser = aliasFor('user', userKey);
+  const pseudonymizeDevice = aliasFor('device', deviceKey);
+  return fixture.alerts.map((alert) => safeRow(alert, pseudonymizeUser, pseudonymizeDevice));
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const rows = await readAlerts();
-  for (const row of rows) {
-    console.log([
-      row.timestamp ?? '-',
-      row.sourceAddress ?? '-',
-      row.account ?? '-',
-      row.ruleLevel ?? '-',
-      row.description ?? '-',
-    ].join('\t'));
-  }
-  console.error(`경보 ${rows.length}건 / 뽑은 줄 ${rows.length}줄`);
+  for (const row of rows) console.log(JSON.stringify(row));
 }

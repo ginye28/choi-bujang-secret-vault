@@ -107,6 +107,36 @@ test('알 수 없는 경로·기능 단어·깊이가 다른 경로는 거부된
   }
 });
 
+test('평소와 다른 네트워크와 갑작스러운 다량 조회가 함께 있을 때만 추가 확인한다', async () => {
+  const path = `/notes/${NOTE_ID}`;
+  const route = 'GET /notes/:id';
+  const burst = [{ kind: 'risk_signal', ageSeconds: 60, count: 20 }];
+
+  const normal = await outcome(request('GET', path, route));
+  assert.deepEqual([normal.decision, normal.reasonCode], ['allow', 'approved']);
+
+  const regionOnly = await outcome(request('GET', path, route, {
+    signals: { source: 'judge_fixture', region: 'foreign', network: 'usual', hour: 14 },
+  }));
+  assert.deepEqual([regionOnly.decision, regionOnly.reasonCode], ['allow', 'approved']);
+
+  const burstWithoutNewNetwork = await outcome(request('GET', path, route, {
+    recentEvents: burst,
+  }));
+  assert.deepEqual([burstWithoutNewNetwork.decision, burstWithoutNewNetwork.reasonCode], ['allow', 'approved']);
+
+  const unusualNetworkWithoutBurst = await outcome(request('GET', path, route, {
+    signals: { source: 'judge_fixture', region: 'local', network: 'unusual', hour: 14 },
+  }));
+  assert.deepEqual([unusualNetworkWithoutBurst.decision, unusualNetworkWithoutBurst.reasonCode], ['allow', 'approved']);
+
+  const combined = await outcome(request('GET', path, route, {
+    signals: { source: 'judge_fixture', region: 'local', network: 'unusual', hour: 14 },
+    recentEvents: burst,
+  }));
+  assert.deepEqual([combined.decision, combined.reasonCode], ['step_up', 'step_up_required']);
+});
+
 test('미등록 기기는 구역과 관계없이 먼저 거부되고 이전 규칙은 유지된다', async () => {
   const unregistered = await outcome(request('GET', `/notes/${NOTE_ID}`, 'GET /notes/:id',
     { deviceRegistered: false }));
