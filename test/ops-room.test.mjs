@@ -2,17 +2,17 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
-  buildOpsReport, PENDING_CHECKS, runLocalChecks, STATUS_NOT_RUN, STATUS_RAN_MATCHED, summarizeDevices,
+  buildOpsReport, PENDING_CHECKS, runLocalChecks, STATUS_CODE_MATCHED, STATUS_NOT_RUN, STATUS_RAN_MATCHED, summarizeDevices,
   summarizeRecovery,
 } from '../src/ops-room.mjs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('코드 직접 호출 점검 전부가 실행·일치이고 요청 ID와 시각이 있다', async () => {
+test('코드 직접 호출 점검 전부가 코드 시험·일치(실제 API 미실행)이고 요청 ID와 시각이 있다', async () => {
   const rows = await runLocalChecks();
   assert.ok(rows.length >= 19);
   for (const item of rows) {
-    assert.equal(item.status, STATUS_RAN_MATCHED, `${item.id}: ${item.actual}`);
+    assert.equal(item.status, STATUS_CODE_MATCHED, `${item.id}: ${item.actual}`);
     assert.ok(item.requestId && item.checkedAt && item.expected && item.actual);
   }
   const stages = new Set(rows.map((item) => item.stage));
@@ -22,7 +22,7 @@ test('코드 직접 호출 점검 전부가 실행·일치이고 요청 ID와 �
 test('총공세 세 가지: 연속 조회·회수 신원 재전송·복구 뒤 서명 없는 변경', async () => {
   const rows = await runLocalChecks();
   for (const id of ['s12_auth_then_other', 's12_unregistered_then_revoked', 's12_after_restore']) {
-    assert.equal(rows.find((item) => item.id === id)?.status, STATUS_RAN_MATCHED, id);
+    assert.equal(rows.find((item) => item.id === id)?.status, STATUS_CODE_MATCHED, id);
   }
 });
 
@@ -30,8 +30,11 @@ test('미실행 점검은 통과로 세지 않고 이유를 남긴다', async ()
   const rows = await runLocalChecks();
   const report = buildOpsReport({ rows, recovery: [], devices: [] });
   assert.equal(report.verification.notRun, PENDING_CHECKS.length);
-  assert.equal(report.verification.executed, rows.length);
-  assert.equal(report.verification.matched + report.verification.mismatched, rows.length);
+  // 코드 시험은 실제 API 실행으로 세지 않는다.
+  assert.equal(report.verification.apiExecuted, 0);
+  assert.equal(report.verification.codeTests, rows.length);
+  assert.equal(report.verification.codeMatched + report.verification.codeMismatched, rows.length);
+  assert.equal(report.verification.rows.some((item) => item.status === STATUS_RAN_MATCHED), false);
   for (const item of report.verification.pending) {
     assert.equal(item.status, STATUS_NOT_RUN);
     assert.ok(item.reason.length > 5);
@@ -68,11 +71,16 @@ test('실제 배포 API 기록과 코드 직접 호출 결과의 출처를 구�
   const report = buildOpsReport({ rows, deployedRows: deployed, recovery: [], devices: [] });
   const directRow = report.verification.rows.find((item) => item.id === rows[0].id);
   const deployedRow = report.verification.rows.find((item) => item.id === 'd12_probe');
-  assert.equal(directRow.source, '코드 직접 호출');
+  assert.equal(directRow.source, '코드 직접 호출(실제 API 아님)');
+  assert.equal(directRow.status, STATUS_CODE_MATCHED);
   assert.equal(deployedRow.source, '배포 API 응답');
-  assert.equal(report.verification.executed, rows.length + deployed.length);
-  assert.equal(report.verification.matched, report.verification.rows.filter((item) => item.status === STATUS_RAN_MATCHED).length);
-  assert.equal(report.verification.mismatched, report.verification.rows.length - report.verification.matched);
+  assert.equal(report.verification.apiExecuted, deployed.length);
+  assert.equal(report.verification.apiMatched, report.verification.rows.filter((item) => item.status === STATUS_RAN_MATCHED).length);
+  assert.equal(report.verification.codeTests, rows.length);
+  // 코드 시험 행에 실행·일치가 적혀 와도 실제 API 결과로 바꾸지 않는다.
+  const forged = buildOpsReport({ rows: [{ ...rows[0], status: STATUS_RAN_MATCHED }], recovery: [], devices: [] });
+  assert.equal(forged.verification.apiExecuted, 0);
+  assert.equal(forged.verification.rows[0].status, STATUS_CODE_MATCHED);
   assert.equal(report.verification.notRun, report.verification.pending.length);
   const json = JSON.stringify(report);
   assert.equal(json.includes('가상 메모 본문'), false);

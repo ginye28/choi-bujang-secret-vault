@@ -16,8 +16,13 @@ export const REASON_CODES = Object.freeze([
   'route_not_allowed', 'query_not_allowed', 'announcement_write_denied',
 ]);
 
+// 실행·일치 / 실행·불일치: 실제 배포 API 에 요청을 보내 받은 응답(배포 API 응답)에만 씁니다.
 export const STATUS_RAN_MATCHED = '실행·일치';
 export const STATUS_RAN_MISMATCHED = '실행·불일치';
+// 코드 시험: 판정기·탐지·기기 서명 코드를 직접 호출한 결과입니다. 실제 API 결과가 아니므로
+// 41종 시험의 막음·통과로 세지 않고 「실제 API 미실행」으로 표시합니다.
+export const STATUS_CODE_MATCHED = '코드 시험·일치(실제 API 미실행)';
+export const STATUS_CODE_MISMATCHED = '코드 시험·불일치(실제 API 미실행)';
 export const STATUS_NOT_RUN = '미실행';
 
 const EMPTY_SHA256 = createHash('sha256').update('').digest('hex');
@@ -50,7 +55,7 @@ function row(id, stage, scenario, expected, actual, matched, requestId, checkedA
   return {
     id, stage, scenario, expected, actual, requestId,
     checkedAt: checkedAt.toISOString(),
-    status: matched ? STATUS_RAN_MATCHED : STATUS_RAN_MISMATCHED,
+    status: matched ? STATUS_CODE_MATCHED : STATUS_CODE_MISMATCHED,
   };
 }
 
@@ -64,8 +69,8 @@ function burst(count, spacingMs, start) {
 // 실행하지 못한 점검: 통과로 세지 않고 이유를 함께 남깁니다.
 export const PENDING_CHECKS = Object.freeze([
   {
-    id: 'deployed_authenticated_notes', stage: '3~8',
-    scenario: '로그인한 시험 계정으로 배포 /api/notes 목록·상세·수정·삭제를 호출',
+    id: 'deployed_authenticated_notes', stage: '3~8, 12',
+    scenario: '로그인한 시험 계정으로 배포 /api/notes 목록·상세·수정·삭제를 호출(12단계 총공세: 자기 메모 조회 뒤 다른 사용자 메모 조회 연속 전송 포함)',
     expected: '자기 메모만 보이고 다른 사용자 메모는 거부',
     reason: '시험용 로그인 토큰을 이 점검 환경에 넣지 않아 보내지 않았습니다.',
   },
@@ -80,6 +85,12 @@ export const PENDING_CHECKS = Object.freeze([
     scenario: '운영 반 엔진의 사건 전달과 접속 회수',
     expected: '회수 제안이 엔진을 거쳐 실제 접속 차단으로 이어짐',
     reason: '엔진 연결은 운영 측 기능이라 학생 환경에서 실측하지 못했습니다.',
+  },
+  {
+    id: 'deployed_assault_revoked_and_restore', stage: '12',
+    scenario: '배포 API 에 미등록 기기 요청 뒤 회수된 신원 재전송, 복구 뒤 서명 없는 변경 요청과 구역 밖 조회',
+    expected: '모두 거부',
+    reason: '로그인 토큰·기기 등록·쓰기 요청이 필요해 실제 배포 API 로는 보내지 않았습니다. 코드 시험 결과는 통과로 세지 않습니다.',
   },
   {
     id: 'installed_app_device', stage: '11',
@@ -254,12 +265,18 @@ export function summarizeDevices(records) {
   return { ...counts, total: counts.approved + counts.pending + counts.other };
 }
 
+const SOURCE_CODE = '코드 직접 호출(실제 API 아님)';
+const SOURCE_API = '배포 API 응답';
+
 function safeReportRow(item, source) {
   const text = (value, maxLength) => typeof value === 'string'
     ? value.slice(0, maxLength).replace(/[\u0000-\u001f\u007f]/gu, ' ')
     : '';
   const id = typeof item?.id === 'string' && /^[a-z0-9_]{1,64}$/u.test(item.id) ? item.id : 'redacted';
-  const status = item?.status === STATUS_RAN_MATCHED ? STATUS_RAN_MATCHED : STATUS_RAN_MISMATCHED;
+  // 출처가 코드 직접 호출이면 어떤 상태가 적혀 있어도 「코드 시험」으로만 표시합니다(실제 API 결과로 세지 않음).
+  const status = source === SOURCE_CODE
+    ? (item?.status === STATUS_CODE_MATCHED || item?.status === STATUS_RAN_MATCHED ? STATUS_CODE_MATCHED : STATUS_CODE_MISMATCHED)
+    : (item?.status === STATUS_RAN_MATCHED ? STATUS_RAN_MATCHED : STATUS_RAN_MISMATCHED);
   return {
     id,
     source,
@@ -276,14 +293,16 @@ function safeReportRow(item, source) {
 export function summarizeVerification(executedRows, deployedRows = [], pending = PENDING_CHECKS) {
   // 기록은 화면에 필요한 열만 반환합니다. 서버 기록에 본문 등 추가 필드가 있어도 응답에 복사하지 않습니다.
   // 출처도 분리해 코드 직접 호출 결과를 실제 배포 API 응답으로 오인하지 않게 합니다.
-  const rows = [
-    ...executedRows.map((item) => safeReportRow(item, '코드 직접 호출')),
-    ...deployedRows.map((item) => safeReportRow(item, '배포 API 응답')),
-  ];
-  const matched = rows.filter((item) => item.status === STATUS_RAN_MATCHED).length;
+  const codeRows = executedRows.map((item) => safeReportRow(item, SOURCE_CODE));
+  const apiRows = deployedRows.map((item) => safeReportRow(item, SOURCE_API));
+  const apiMatched = apiRows.filter((item) => item.status === STATUS_RAN_MATCHED).length;
+  const codeMatched = codeRows.filter((item) => item.status === STATUS_CODE_MATCHED).length;
   return {
-    executed: rows.length, matched, mismatched: rows.length - matched, notRun: pending.length,
-    rows,
+    // 실제 API 실행은 배포 API 응답 행만 셉니다. 코드 시험은 따로 세고 막음·통과에 넣지 않습니다.
+    apiExecuted: apiRows.length, apiMatched, apiMismatched: apiRows.length - apiMatched,
+    codeTests: codeRows.length, codeMatched, codeMismatched: codeRows.length - codeMatched,
+    notRun: pending.length,
+    rows: [...apiRows, ...codeRows],
     pending: pending.map((item) => ({ ...item, status: STATUS_NOT_RUN })),
   };
 }

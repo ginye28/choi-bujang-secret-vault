@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { PENDING_CHECKS, runLocalChecks, STATUS_NOT_RUN, STATUS_RAN_MATCHED, STATUS_RAN_MISMATCHED } from '../src/ops-room.mjs';
+import { PENDING_CHECKS, runLocalChecks, STATUS_CODE_MATCHED, STATUS_NOT_RUN, STATUS_RAN_MATCHED, STATUS_RAN_MISMATCHED } from '../src/ops-room.mjs';
 
 // 12단계 점검 기록 만들기: node scripts/verify-all.mjs [--deployed]
 // - 항상: 판정기·탐지·정책 사본·기기 서명 코드를 직접 호출한 결과(실행)
@@ -74,8 +74,9 @@ const md = [
   '# 12단계 점검 기록', '',
   `생성: ${log.generatedAt}`, '',
   '학생이 직접 실행한 점검입니다. 심판의 41종 시험 결과를 대신하지 않으며, 미실행 항목은 통과로 세지 않습니다.', '',
-  '## 코드 직접 호출(판정기·탐지·정책 사본·기기 서명)', '', table(executed), '',
-  '## 배포 주소 요청(로그인 없는 요청)', '',
+  '## 코드 시험(판정기·탐지·정책 사본·기기 서명을 코드로 직접 호출)', '',
+  '실제 배포 API 결과가 아닙니다. 41종 시험의 막음·통과로 세지 않으며, 실제 API 로는 미실행입니다.', '', table(executed), '',
+  '## 실제 배포 API 요청(로그인 없는 요청)', '',
   deployed.length ? table(deployed) : '`node scripts/verify-all.mjs --deployed` 를 실행하지 않아 미실행입니다.', '',
   '## 미실행', '',
   '| 단계 | 시험 | 기대 결과 | 이유 |', '|---|---|---|---|',
@@ -83,7 +84,7 @@ const md = [
 ].join('\n');
 writeFileSync(join(root, 'docs', 'VERIFICATION.md'), md, 'utf8');
 
-const bad = [...executed, ...deployed].filter((item) => item.status !== STATUS_RAN_MATCHED);
-process.stdout.write(`점검 기록 작성: 코드 ${executed.length}건, 배포 ${deployed.length}건, 미실행 ${PENDING_CHECKS.length}건, 불일치 ${bad.length}건\n`);
+const bad = [...executed.filter((item) => item.status !== STATUS_CODE_MATCHED), ...deployed.filter((item) => item.status !== STATUS_RAN_MATCHED)];
+process.stdout.write(`점검 기록 작성: 실제 API ${deployed.length}건, 코드 시험 ${executed.length}건(실제 API 미실행), 미실행 ${PENDING_CHECKS.length}건, 불일치 ${bad.length}건\n`);
 for (const item of bad) process.stdout.write(`불일치: ${item.id} 기대 ${item.expected} / 실제 ${item.actual}\n`);
 process.exitCode = bad.length ? 1 : 0;

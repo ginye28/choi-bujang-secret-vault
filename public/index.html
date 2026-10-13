@@ -478,7 +478,7 @@
         recent.append(entry);
       }
       const verification = report.verification;
-      opsText('#ops-verification', `실행 ${verification.executed}건 중 일치 ${verification.matched}건, 불일치 ${verification.mismatched}건 · 미실행 ${verification.notRun}건 · 확인 ${report.generatedAt}`);
+      opsText('#ops-verification', `실제 API 실행 ${verification.apiExecuted}건(일치 ${verification.apiMatched} · 불일치 ${verification.apiMismatched}) · 코드 시험 ${verification.codeTests}건(실제 API 미실행, 막음·통과로 세지 않음) · 미실행 ${verification.notRun}건 · 확인 ${report.generatedAt}`);
       const body = document.querySelector('#ops-table tbody');
       body.replaceChildren();
       for (const item of verification.rows) {
