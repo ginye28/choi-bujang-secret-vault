@@ -70,6 +70,10 @@ export default async function handler(request, response) {
     if (request.method === 'GET') {
       const url = new URL(request.url ?? '/', 'http://localhost');
       const deviceId = request.query?.deviceId ?? url.searchParams.get('deviceId');
+      if (deviceId === null || deviceId === undefined) {
+        const devices = await store.listOwned(identity.userId);
+        return response.status(200).json({ devices: devices.map(summary) });
+      }
       if (!isDeviceId(deviceId)) return response.status(400).json({ error: 'INVALID_DEVICE_ID' });
       const record = await store.load(deviceId);
       if (!record || record.owner !== identity.userId) {

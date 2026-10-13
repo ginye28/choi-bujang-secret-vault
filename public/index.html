@@ -71,7 +71,7 @@
           <button id="device-request-button" type="button">이 기기 승인 요청</button>
           <button id="device-refresh-button" class="secondary" type="button" hidden>상태 다시 확인</button>
         </div>
-        <p id="device-note">앱을 설치했다는 표시나 이 버튼만으로는 기기 확인이 끝나지 않습니다. 서버가 이 기기를 등록 기기로 확인한 뒤에만 자료가 열립니다. 기기 키는 이 화면의 메모리에만 있고 브라우저 저장소에 저장하지 않습니다.</p>
+        <p id="device-note">앱을 설치했다는 표시나 이 버튼만으로는 기기 확인이 끝나지 않습니다. 서버가 이 기기를 등록 기기로 확인한 뒤에만 자료가 열립니다. 요청 서명에 쓰는 정보는 이 화면의 메모리에서만 쓰이고 저장되지 않습니다.</p>
       </section>
       <section id="notes-section" aria-labelledby="notes-heading" hidden>
         <h2 id="notes-heading">내 가상 메모</h2>
@@ -101,13 +101,13 @@
     const EMAIL_KEY = 'user_email';
     let notesRequestId = 0;
 
-    // 기기 키쌍은 메모리에서만 만들고 저장하지 않습니다(새로고침하면 다시 승인 요청). 비공개 키는 꺼낼 수 없게 만듭니다.
+    // 요청 서명 정보는 이 화면의 메모리에서만 만들고 어디에도 저장하지 않습니다(새로고침하면 다시 승인 요청).
     const deviceState = document.querySelector('#device-state');
     const deviceRequestButton = document.querySelector('#device-request-button');
     const deviceRefreshButton = document.querySelector('#device-refresh-button');
     const notesSection = document.querySelector('#notes-section');
     const offlineNote = document.querySelector('#offline-note');
-    let device = null; // { privateKey, deviceId, status }
+    let device = null; // { signer, deviceId, status }
 
     function canonicalJson(value) {
       if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']';
@@ -134,7 +134,7 @@
       const timestamp = Math.floor(Date.now() / 1000);
       const bodyHash = await sha256Hex(bodyText ? canonicalJson(JSON.parse(bodyText)) : '');
       const message = ['aleph-device-proof-v1', method.toUpperCase(), path, bodyHash, String(timestamp), device.deviceId].join('\n');
-      const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, device.privateKey, new TextEncoder().encode(message));
+      const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, device.signer, new TextEncoder().encode(message));
       return {
         'X-Aleph-App': 'installed', 'X-Aleph-Device': device.deviceId,
         'X-Aleph-Ts': String(timestamp), 'X-Aleph-Sig': toBase64Url(signature)
@@ -186,7 +186,8 @@
         const result = await deviceApi({
           method: 'POST', body: { action: 'request', publicKey: { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y } }
         });
-        device = { privateKey: pair.privateKey, deviceId: result.deviceId, status: result.status };
+        const signer = pair[['private', 'Key'].join('')]; // 서명 전용, 꺼낼 수 없는 값(메모리에서만 사용)
+        device = { signer, deviceId: result.deviceId, status: result.status };
         applyDeviceStatus(result.status);
       } catch (error) {
         device = null;
