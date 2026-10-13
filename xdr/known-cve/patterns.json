@@ -1,0 +1,30 @@
+{
+  "moduleKey": "known-cve",
+  "basis": "CVE-2021-44228(Log4Shell) 형태 요청, MITRE ATT&CK T1190(외부 공개 앱 악용)",
+  "patterns": [
+    {
+      "name": "jndi 원격 조회 구문",
+      "condition": "요청 머리글·주소·인자 안에 ${jndi:ldap://…} 처럼 jndi 조회 접두사와 원격 프로토콜(ldap·ldaps·rmi·dns·iiop 등)이 함께 있음. 대소문자와 ${lower:j} 같은 분해 표기, 퍼센트 인코딩은 풀어서 확인함",
+      "evidence": "CVE-2021-44228 악용은 로그에 남는 ${jndi:프로토콜://서버} 문자열이 원격 클래스를 불러오는 방식이라 이 형태 자체가 공격 요청임 (MITRE T1190)",
+      "confidence": 0.95
+    },
+    {
+      "name": "알려진 취약점 점검 도구의 흔적",
+      "condition": "User-Agent·주소·인자에 nuclei, log4j-scan, log4shell, interactsh, oast, dnslog, burpcollaborator 같은 취약점 점검 도구·콜백 서비스 이름이 있음",
+      "evidence": "이 도구들은 CVE-2021-44228 같은 공개 취약점을 대량으로 시험할 때 쓰이는 것으로 알려져 있어 단독이면 시도 흔적으로 봄 (MITRE T1190)",
+      "confidence": 0.75
+    },
+    {
+      "name": "jndi 조회 구문 조각",
+      "condition": "원격 프로토콜 없이 ${jndi 또는 jndi: 만 있는 잘린 조회 형태",
+      "evidence": "완전한 구문은 아니지만 CVE-2021-44228 악용 문자열의 앞부분과 같아 사람이 확인할 가치가 있음",
+      "confidence": 0.7
+    },
+    {
+      "name": "취약점 이름 언급과 높은 경보 수준",
+      "condition": "원격 조회 구문은 없으나 경보 수준 5 이상이고 MITRE T1190 으로 분류됨",
+      "evidence": "Wazuh 규칙이 T1190 으로 올린 경보라서 악용 구문이 없어도 알림으로 남김 (MITRE T1190)",
+      "confidence": 0.55
+    }
+  ]
+}
