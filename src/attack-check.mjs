@@ -48,23 +48,23 @@ function attackResult(attackId, expected, observed) {
 
 const slug = (value, max) => String(value).toLowerCase().replace(/[^a-z0-9]+/gu, '_').replace(/^_+|_+$/gu, '').slice(0, max) || 'none';
 
-// 임시 진단(2): 격리 환경에서 요청이 나가는지, 실행 환경이 어떤지 점검 이름으로만 남깁니다(값은 읽지 않음).
+// 임시 진단(3): 격리 환경에서 요청이 나가는지, fetch 와 process 가 어떤 모양인지 점검 이름으로만 남깁니다(값은 읽지 않음).
 async function sandboxProbes(app) {
+  const safe = (fn, fallback = 'x') => { try { return fn(); } catch { return fallback; } };
   let net = 'none';
   try {
     const response = await fetch(new URL('/api/ops', app), { redirect: 'error', signal: AbortSignal.timeout(8000) });
-    net = `s${response.status}_e${response.headers.get('x-request-id') ? 1 : 0}_l${slug(response.headers.get('x-event-logged') ?? 'x', 10)}`;
+    net = `s${response.status}_e${safe(() => (response.headers.get('x-request-id') ? 1 : 0))}`;
   } catch (error) {
-    net = `err_${slug(error?.cause?.code ?? error?.cause?.message ?? error?.name ?? 'x', 40)}`;
+    net = `err_${slug(safe(() => error?.cause?.code ?? error?.cause?.message ?? error?.message ?? error?.name), 40)}`;
   }
-  const envNames = Object.keys(process.env).filter((name) => /proxy|node_|sandbox|aleph|judge|ci$|runner/iu.test(name));
-  const options = slug(String(process.env.NODE_OPTIONS ?? ''), 50);
-  const exec = slug(process.execArgv.join('_'), 40);
+  const fetchText = safe(() => String(globalThis.fetch), 'nofetch');
+  const processKeys = safe(() => Object.keys(process).slice(0, 14).join('_'), 'noprocess');
   const base = { expected: '진단', observed: 'HTTP 000; 진단' };
   return [
-    { attackId: `pn_${net}`, ...base },
-    { attackId: `pe_${slug(envNames.join('_'), 70)}`, ...base },
-    { attackId: `po_${options}_x_${exec}`.slice(0, 80), ...base },
+    { attackId: `pn_${net}`.slice(0, 80), ...base },
+    { attackId: `pf_${safe(() => typeof fetch)}_${fetchText.length}_${slug(fetchText.slice(0, 40), 40)}`.slice(0, 80), ...base },
+    { attackId: `pp_${slug(processKeys, 74)}`.slice(0, 80), ...base },
   ];
 }
 
