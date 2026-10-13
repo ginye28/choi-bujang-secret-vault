@@ -99,8 +99,10 @@ function validEngineRequest(request) {
 const ZONES = Object.freeze({
   notes: {
     collection: '/notes', item: '/notes/:id',
-    // 8단계는 자기 메모 읽기·수정만 구역으로 허용합니다. 삭제는 구역 규칙에서 열지 않습니다.
-    methods: { '/notes': ['GET', 'POST'], '/notes/:id': ['GET', 'PUT'] },
+    // 8단계 구역 규칙은 "자기 메모 읽기·수정"(자료 ID 하나를 가리키는 GET·PUT)만 허용합니다.
+    // 목록(/notes)·생성·삭제는 구역 규칙이 열지 않습니다. 목록은 어느 구역의 메모를 모아
+    // 내줄지 판정기가 구분할 수 없고, 사용자별 범위는 자료 API가 소유자 조건으로 적용합니다.
+    methods: { '/notes': [], '/notes/:id': ['GET', 'PUT'] },
   },
   announcements: {
     collection: '/announcements', item: '/announcements/:id',
@@ -194,11 +196,6 @@ function zoneDecision(request) {
   if (hit.service === 'notes' && hit.template === hit.zone.item
       && hasOwnerMarker(hit.id)
       && !ownerMarkerMatchesSubject(hit.id, request.subjectId)) {
-    return { allow: false, reasonCode: 'zone_other_owner', ruleId: RULE_IDS[2] };
-  }
-  // [실험] 자료 ID에 요청자의 subjectId가 들어 있을 때만 자기 메모로 인정합니다.
-  if (hit.service === 'notes' && hit.template === hit.zone.item
-      && !hit.id.toLowerCase().includes(String(request.subjectId).toLowerCase())) {
     return { allow: false, reasonCode: 'zone_other_owner', ruleId: RULE_IDS[2] };
   }
   return { allow: true, ruleId: hit.service === 'notes' ? RULE_IDS[2] : RULE_IDS[3] };

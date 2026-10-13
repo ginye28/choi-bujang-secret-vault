@@ -25,8 +25,6 @@ const outcome = async (r) => {
 
 test('자기 메모 읽기·수정은 허용된다', async () => {
   for (const [method, path, route] of [
-    ['GET', '/notes', 'GET /notes'],
-    ['POST', '/notes', 'POST /notes'],
     ['GET', `/notes/${NOTE_ID}`, 'GET /notes/:id'],
     ['PUT', `/notes/${NOTE_ID}`, 'PUT /notes/:id'],
     ['GET', '/notes/demo', 'GET /notes/:id'],
@@ -37,9 +35,15 @@ test('자기 메모 읽기·수정은 허용된다', async () => {
   }
 });
 
-test('삭제와, 쿼리가 붙은 자료 경로는 구역 규칙이 열지 않는다', async () => {
-  const del = await outcome(request('DELETE', `/notes/${NOTE_ID}`, 'DELETE /notes/:id'));
-  assert.deepEqual([del.decision, del.reasonCode], ['deny', 'route_not_allowed']);
+test('목록·생성·삭제는 구역 규칙이 열지 않고, 쿼리가 붙은 자료 경로도 거부한다', async () => {
+  for (const [method, path, route] of [
+    ['GET', '/notes', 'GET /notes'],
+    ['POST', '/notes', 'POST /notes'],
+    ['DELETE', `/notes/${NOTE_ID}`, 'DELETE /notes/:id'],
+  ]) {
+    const out = await outcome(request(method, path, route));
+    assert.deepEqual([out.decision, out.reasonCode], ['deny', 'route_not_allowed'], `${route}`);
+  }
 
   for (const [method, path, route] of [
     ['GET', `/notes/${NOTE_ID}`, 'GET /notes/:id'],
