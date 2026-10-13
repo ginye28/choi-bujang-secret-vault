@@ -14,7 +14,8 @@
     "policy:restore": "node scripts/policy-restore.mjs restore",
     "fixture:7": "node scripts/fixture-7.mjs",
     "xdr:run": "node scripts/xdr-run.mjs",
-    "verify:all": "node scripts/verify-all.mjs"
+    "verify:all": "node scripts/verify-all.mjs",
+    "checks:record": "node scripts/check-record.mjs"
   },
   "engines": {
     "node": ">=22"

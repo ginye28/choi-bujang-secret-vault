@@ -40,6 +40,8 @@
     #device-panel { margin-top: 20px; padding: 14px; border: 1px solid #40566f; border-radius: 12px; background: #142235; }
     #device-state { font-weight: 700; }
     #device-note { margin: 8px 0 0; font-size: 14px; }
+    #checks-panel { margin-top: 24px; padding: 14px; border: 1px solid #40566f; border-radius: 12px; background: #142235; }
+    #checks-panel p, #checks-panel li { overflow-wrap: anywhere; }
     #ops-panel { margin-top: 20px; padding: 14px; border: 1px solid #40566f; border-radius: 12px; background: #142235; }
     #ops-panel h3 { margin: 16px 0 6px; color: #8ad8df; }
     #ops-panel p, #ops-panel li { overflow-wrap: anywhere; }
@@ -96,6 +98,7 @@
           <p id="ops-recovery"></p>
           <ul id="ops-versions"></ul>
           <h3>총공세</h3>
+          <p id="ops-checks"></p>
           <p id="ops-totals"></p>
           <h3>규칙별 거부 수</h3>
           <ul id="ops-deny"></ul>
@@ -122,6 +125,13 @@
         <p id="notes-status" role="status" aria-live="polite"></p>
         <ul id="notes-list"></ul>
       </section>
+    </section>
+    <section id="checks-panel" aria-labelledby="checks-heading">
+      <h2 id="checks-heading" style="margin-top:0">탈환 작전실 · 제출 점검 기록</h2>
+      <p>아래 수치는 <code>GET /api/checks</code> 응답(커밋된 가린 점검 기록 <code>docs/check-record.json</code>)에서 센 값만 표시합니다. 요청 주소와 메모 본문은 기록하지 않습니다.</p>
+      <p id="checks-summary" role="status" aria-live="polite">제출 점검 기록을 불러오는 중입니다.</p>
+      <ul id="checks-list"></ul>
+      <p id="checks-judge"></p>
     </section>
     <p id="status" role="status" aria-live="polite"></p>
   </main>
@@ -386,6 +396,34 @@
       }
     }
 
+    // 제출 점검 기록의 수치 문장. /api/checks 와 /api/ops 가 같은 기록(docs/check-record.json)의 요약을 줍니다.
+    const RESULT_LABEL = { blocked: '막음', breached: '뚫림', not_run: '미실행' };
+    function checksSummaryText(checks) {
+      if (!checks?.available) return '제출 점검 기록이 없습니다(미실행). 수치를 채우지 않습니다.';
+      const counts = checks.counts;
+      return `제출 점검 기록: 점검 항목 ${counts.total}건 · 막은 공격 ${counts.blocked}건 · 뚫린 공격 ${counts.breached}건 · 실행하지 않은 점검 ${counts.notRun}건 · 기록 시각 ${checks.checkedAt}`;
+    }
+
+    async function loadPublicChecks() {
+      const summary = document.querySelector('#checks-summary');
+      const list = document.querySelector('#checks-list');
+      list.replaceChildren();
+      try {
+        const response = await fetch('/api/checks', { headers: { accept: 'application/json' }, cache: 'no-store' });
+        const checks = await response.json();
+        if (!response.ok || checks?.schema !== 'aleph.checks.summary.v1') throw new Error('bad_response');
+        summary.textContent = checksSummaryText(checks);
+        for (const row of checks.rows) {
+          const item = document.createElement('li');
+          item.textContent = `${row.attackId} — 기대: ${row.expected} · 관측: ${row.observed} → ${RESULT_LABEL[row.result] ?? '미실행'}`;
+          list.append(item);
+        }
+        document.querySelector('#checks-judge').textContent = `심판 41종 시험: ${checks.judgeSuite.status} — 이 기록에 결과 ${checks.judgeSuite.recorded}건, 막음·통과로 세지 않습니다.`;
+      } catch {
+        summary.textContent = '제출 점검 기록을 불러오지 못했습니다(미실행). 수치를 채우지 않습니다.';
+      }
+    }
+
     // 탈환 작전실: 모든 요약과 수치는 보호된 /api/ops 응답의 값으로만 표시합니다.
     function opsText(selector, text) {
       document.querySelector(selector).textContent = text;
@@ -413,6 +451,7 @@
         item.textContent = `${version.noteRef} · 해시 ${version.sha16} · ${version.savedAt ?? '시각 없음'}`;
         versions.append(item);
       }
+      opsText('#ops-checks', checksSummaryText(report.checks));
       const events = report.events;
       const judge = report.judgeSuite;
       const outcomes = events.outcomes;
@@ -580,6 +619,7 @@
     } else {
       renderUser(null);
     }
+    loadPublicChecks();
   </script>
 </body>
 </html>

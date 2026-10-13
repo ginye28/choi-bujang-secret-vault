@@ -14,7 +14,8 @@
 - `src/event-log.mjs` 가 `/api/notes`·`/api/announcements`·`/api/restore`·`/api/device`·`/api/ops` 의 모든 요청을 응답을 보내기 전에 기록합니다. 기록 한 건은 요청 ID(응답 헤더 `X-Request-Id` 로도 돌려줌), 시각, 방식, 가린 경로(`/api/notes/:id`), 응답 상태, 이유 코드, 점검 이름(`x-aleph-attack-id` 헤더가 있을 때), 행위자 종류와 짧은 가명 값뿐입니다. 토큰·이메일·메모 제목·본문·전체 자료 ID는 남기지 않습니다.
 - 작전실의 **최근 사건 50줄**, **규칙별 거부 수**, **거부·허용·서버 오류 건수** 는 이 기록에서만 셉니다. 빼기나 추정으로 채운 수치는 없습니다.
 - 로그인 사용자의 기록은 본인에게만 보이고, 로그인 없는 요청과 거부된 요청의 기록은 가려진 형태로 모두에게 보입니다. 오래된 기록은 자동으로 지워 최근 수백 건만 유지합니다.
-- `npm run bundle` 의 자체 점검(`src/attack-check.mjs`)은 읽기(GET) 요청만 보냅니다. 심판 실행기가 같은 응답을 독립적으로 관측할 수 있도록 요청마다 fetch 옵션 `alephEvidence: { caseId: <attackId>, requestKey: 'read' }` 로 점검 이름과 요청을 연결합니다(ALEPH 공개 통과 표본 `ChoiTimo/byteback-sample-pass` 의 방식). 이 정보는 요청 헤더나 URL에 넣지 않습니다. `observed` 에는 관측한 사실(`HTTP 401; JSON: 예`)만 적고, 요청을 보내지 못한 점검은 `not_run` 으로 둡니다.
+- `npm run bundle` 의 자체 점검(`src/attack-check.mjs`)은 읽기(GET) 요청만 보냅니다. 심판 실행기가 같은 응답을 독립적으로 관측할 수 있도록 요청마다 fetch 옵션 `alephEvidence: { caseId: <attackId>, requestKey: 'read' }` 로 점검 이름과 요청을 연결합니다(ALEPH 공개 통과 표본 `ChoiTimo/byteback-sample-pass` 의 방식). 이 정보는 요청 헤더나 URL에 넣지 않습니다. `observed` 에는 심판이 확인하는 관측 값(`HTTP 401; method=GET`)만 적고, 요청을 보내지 못한 점검은 `not_run` 으로 둡니다.
+- **제출 점검 기록과 작전실 수치**: `npm run checks:record` 가 같은 점검을 실제 배포에 실행해 가린 기록 `docs/check-record.json`(점검 이름·기대·관측 값만, 주소·본문 없음)을 씁니다. 로그인 없이 열리는 `GET /api/checks` 와 로그인 후 `GET /api/ops` 는 이 기록을 같은 함수(`src/check-record.mjs`)로 세어 점검 항목·막은 공격·뚫린 공격·실행하지 않은 점검을 돌려주고, 화면은 그 값만 표시합니다. 막음 여부는 `src/attack-check.mjs` 의 `BLOCKED_STATUS` 표와 관측한 HTTP 상태로만 정합니다.
 - 작전실의 서버 기록 수치(거부·허용·서버 오류 건수)는 서버 요청 기록을 그대로 센 값이며 합이 기록 건수와 같습니다. 심판의 41종 시험 결과는 학생 환경에 기록이 없으므로 41종은 모두 「미실행」으로만 표시하고 막음·통과로 세지 않습니다.
 
 ### 실행·미실행 구분
@@ -31,6 +32,7 @@
 1. 설치: `npm ci` (Node 22 이상).
 2. 시험: `node --test test/*.test.mjs` — 시작 틀의 "패키징 함수 기준표" 시험 한 건은 이 작업과 무관하게 실패합니다.
 3. 점검 기록: `npm run verify:all` 또는 `node scripts/verify-all.mjs --deployed`.
+   제출 점검 기록: `npm run checks:record` → `docs/check-record.json` 을 커밋하면 `/api/checks`·작전실 수치가 그 기록으로 바뀝니다. 그다음 `npm run bundle`.
 4. 실행: Vercel 에 push 하면 자동 배포됩니다. 환경 변수는 `SUPABASE_URL`, `SUPABASE_SECRET_KEY` 이며 값은 저장소에 두지 않습니다.
 5. 중지: 문제가 생기면 Vercel 대시보드에서 직전 배포로 되돌리거나 `git revert <커밋>` 후 push 합니다. `git reset --hard` 는 쓰지 않습니다.
 6. 복구: 메모 한 건은 `POST /api/restore`(10단계), 정책은 `npm run policy:diff` 로 차이를 본 뒤 `npm run policy:restore -- --confirm`.

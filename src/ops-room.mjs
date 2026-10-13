@@ -4,6 +4,7 @@ import { detect } from './detect.mjs';
 import { bodyDigest, checkDeviceProof, issueTicket } from './device-proof.mjs';
 import { buildPolicyCopy, diffPolicy, SAFE_POLICY, verifyPolicyCopy } from './policy.mjs';
 import { TOTAL_ATTACKS } from './event-log.mjs';
+import { summarizeCheckRecord } from './check-record.mjs';
 
 // 12단계 탈환 작전실: 1~11단계에서 만든 규칙을 한 곳에 모아 "실제로 실행한 결과"만 보여 줍니다.
 // - 실행한 점검은 이 모듈이 지금 판정기·탐지·기기 서명 코드를 직접 호출해 얻은 값입니다(요청 ID·시각 포함).
@@ -288,7 +289,7 @@ export function summarizeVerification(executedRows, deployedRows = [], pending =
 }
 
 // 화면이 그대로 보여 줄 요약. 화면의 수치는 모두 이 객체의 값입니다.
-export function buildOpsReport({ rows, deployedRows = [], recovery, devices, events = null, policy = buildPolicyCopy(), now = new Date() }) {
+export function buildOpsReport({ rows, deployedRows = [], recovery, devices, events = null, checkRecord = null, policy = buildPolicyCopy(), now = new Date() }) {
   const verdict = verifyPolicyCopy(policy);
   const verification = summarizeVerification(rows, deployedRows);
   const burstRow = rows.find((item) => item.id === 's9_burst');
@@ -307,6 +308,8 @@ export function buildOpsReport({ rows, deployedRows = [], recovery, devices, eve
       policyCopy: { ok: verdict.ok, version: verdict.ok ? verdict.version : null, sha256: verdict.ok ? verdict.sha256.slice(0, 16) : null },
     },
     verification,
+    // 제출 점검 기록(docs/check-record.json)의 요약. GET /api/checks 와 같은 함수·같은 기록에서 셉니다.
+    checks: summarizeCheckRecord(checkRecord),
     // 서버가 실제로 받은 요청의 기록(최근 50줄·규칙별 거부 수·결과별 건수). 위 점검 표와 별개입니다.
     events: events ?? {
       available: false, recordedTotal: 0, recent: [], denyByRule: [],

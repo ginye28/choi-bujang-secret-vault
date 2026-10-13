@@ -38,6 +38,15 @@ function readDeployedRows() {
   }
 }
 
+// 커밋된 제출 점검 기록(docs/check-record.json). /api/checks 와 같은 파일입니다.
+function readCheckRecord() {
+  try {
+    return JSON.parse(readFileSync(new URL('../docs/check-record.json', import.meta.url), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
 // GET /api/ops — 탈환 작전실 요약(12단계). 로그인한 사용자 본인의 복구 버전·기기 상태 숫자와
 // 서버가 지금 실행한 점검 결과만 돌려줍니다. 메모 제목·본문은 읽지도 돌려주지도 않습니다.
 async function handler(request, response) {
@@ -89,7 +98,7 @@ async function handler(request, response) {
       events = { ...summarizeEvents([]), available: false };
     }
     return response.status(200).json(buildOpsReport({
-      rows, deployedRows: readDeployedRows(), recovery: data, devices, events,
+      rows, deployedRows: readDeployedRows(), recovery: data, devices, events, checkRecord: readCheckRecord(),
     }));
   } catch {
     return response.status(500).json({ error: 'OPS_SERVICE_UNAVAILABLE' });

@@ -1,0 +1,47 @@
+{
+  "schema": "aleph.check.record.v1",
+  "checkedAt": "2026-10-13T07:34:16.406Z",
+  "note": "npm run checks:record 로 실제 배포에 보낸 읽기 요청의 관측 값입니다. 심판의 41종 시험 결과가 아닙니다.",
+  "attempts": [
+    {
+      "attackId": "public_data_json_gone",
+      "expected": "GET /data.json은 HTTP 404",
+      "observed": "HTTP 404; method=GET"
+    },
+    {
+      "attackId": "anonymous_notes_list_rejected",
+      "expected": "인증 헤더 없는 GET /api/notes는 HTTP 401",
+      "observed": "HTTP 401; method=GET"
+    },
+    {
+      "attackId": "anonymous_note_item_rejected",
+      "expected": "인증 헤더 없이 다른 사람 메모 GET /api/notes/<자료 ID>는 HTTP 401",
+      "observed": "HTTP 401; method=GET"
+    },
+    {
+      "attackId": "fake_token_rejected",
+      "expected": "가짜 Bearer 토큰을 보낸 GET /api/notes는 HTTP 401",
+      "observed": "HTTP 401; method=GET"
+    },
+    {
+      "attackId": "anonymous_restore_route_rejected",
+      "expected": "인증 헤더 없는 GET /api/restore는 HTTP 401",
+      "observed": "HTTP 401; method=GET"
+    },
+    {
+      "attackId": "anonymous_ops_room_rejected",
+      "expected": "인증 헤더 없는 GET /api/ops는 HTTP 401",
+      "observed": "HTTP 401; method=GET"
+    },
+    {
+      "attackId": "installed_marker_without_login_rejected",
+      "expected": "설치 표시만 붙인 로그인 없는 GET /api/notes는 HTTP 401",
+      "observed": "HTTP 401; method=GET"
+    },
+    {
+      "attackId": "direct_original_api_denied",
+      "expected": "키 없는 원본 API 요청은 자료를 반환하지 않고 HTTP 401 또는 403",
+      "observed": "HTTP 401; method=GET"
+    }
+  ]
+}

@@ -161,7 +161,7 @@ test('제출 묶음 점검은 읽기 요청만 보내고 alephEvidence 로 점�
       const headerNames = Object.keys(init.headers ?? {}).map((name) => name.toLowerCase());
       assert.equal(headerNames.some((name) => name.includes('attack') || name === 'x-request-id'), false);
       assert.equal(url.includes(result.attackId), false);
-      assert.equal(result.observed, 'HTTP 401; JSON: 예');
+      assert.equal(result.observed, 'HTTP 401; method=GET');
     });
     globalThis.fetch = async () => { throw new TypeError('network blocked'); };
     const offline = await runAttackChecks('https://student-defense.vercel.app/');
@@ -184,7 +184,7 @@ test('서버 기록은 응답 본문의 sha256만 남기고 본문은 남기지 
 
 test('제출 묶음 점검의 observed 에는 관측한 사실만 적고 계산한 값을 넣지 않는다', () => {
   const source = read('src/attack-check.mjs');
-  assert.ok(source.includes('`HTTP ${response.status}; JSON: '));
-  assert.ok(source.includes("return 'not_run';"));
+  assert.ok(source.includes('`HTTP ${response.status}; method=${method}`'));
+  assert.ok(source.includes('return NOT_RUN;'));
   assert.equal(source.includes('createHash'), false);
 });
