@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { BLOCKED_STATUS, classifyAttempt, runAttackChecks } from '../src/attack-check.mjs';
+import { BLOCKED_STATUS, classifyAttempt, runAttackChecks, UNSENT_CHECKS } from '../src/attack-check.mjs';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -39,7 +39,12 @@ test('기록의 수치는 점검을 하나씩 센 값이고 합이 점검 수와
 test('커밋된 기록은 제출 점검과 같은 점검 이름을 담고, /api/checks·/api/ops 가 같은 수치를 준다', async () => {
   const record = JSON.parse(read('docs/check-record.json'));
   const ids = record.attempts.map((item) => item.attackId).sort();
-  assert.deepEqual(ids, Object.keys(BLOCKED_STATUS).sort());
+  assert.deepEqual(ids, [...Object.keys(BLOCKED_STATUS), ...UNSENT_CHECKS.map(([id]) => id)].sort());
+  for (const [id] of UNSENT_CHECKS) {
+    const item = record.attempts.find((attempt) => attempt.attackId === id);
+    assert.equal(item.observed, 'not_run');
+    assert.equal(item.result, 'not_run');
+  }
   assert.equal(JSON.stringify(record).includes('https://'), false);
 
   let status;
@@ -88,11 +93,14 @@ test('제출 점검 기록과 같은 응답을 받으면 같은 결과가 나온
       step: 12, publicAppUrl: 'https://student-defense.vercel.app/', originalApiUrl: 'https://db.example.org/rest/v1/notes',
     });
     const summary = summarizeCheckRecord(buildCheckRecord(attempts));
-    assert.deepEqual(summary.recorded, { total: attempts.length, blocked: attempts.length, breached: 0, notRun: 0 });
-    assert.deepEqual(summary.counts, { total: 41, executed: attempts.length, blocked: attempts.length, breached: 0, notRun: 41 - attempts.length });
+    const sent = Object.keys(BLOCKED_STATUS).length;
+    const unsent = UNSENT_CHECKS.length;
+    assert.equal(attempts.length, sent + unsent);
+    assert.deepEqual(summary.recorded, { total: sent + unsent, blocked: sent, breached: 0, notRun: unsent });
+    assert.deepEqual(summary.counts, { total: 41, executed: sent, blocked: sent, breached: 0, notRun: 41 - sent });
     for (const attempt of attempts) {
       assert.deepEqual(Object.keys(attempt).sort(), ['attackId', 'expected', 'observed', 'result', 'stage']);
-      assert.equal(attempt.result, 'blocked');
+      assert.equal(attempt.result, attempt.observed === 'not_run' ? 'not_run' : 'blocked');
       assert.ok(Number.isInteger(attempt.stage));
     }
     globalThis.fetch = async () => { throw new TypeError('blocked by sandbox'); };

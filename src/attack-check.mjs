@@ -32,6 +32,13 @@ export const BLOCKED_STATUS = Object.freeze({
 
 export const NOT_RUN = 'not_run';
 
+// 이번 제출 묶음에서 보내지 않은 시험(요청 없음). 결과는 언제나 not_run 입니다.
+export const UNSENT_CHECKS = Object.freeze([
+  ['assault_authenticated_then_other_note', 12, '로그인한 사용자가 자기 메모 조회 바로 뒤 다른 사용자 메모를 조회하면 거부(로그인 토큰이 필요해 보내지 않음)'],
+  ['assault_revoked_identity_resend', 12, '미등록 기기 요청 뒤 회수된 신원으로 다시 보내면 거부(회수된 신원이 필요해 보내지 않음)'],
+  ['assault_unsigned_write_after_restore', 12, '복구 뒤 서명 없는 변경 요청은 거부(쓰기 요청이라 보내지 않음)'],
+]);
+
 // observed 를 막음(blocked)·뚫림(breached)·미실행(not_run) 중 하나로 나눕니다. 추정하지 않고 HTTP 상태만 봅니다.
 export function classifyAttempt(attempt) {
   const match = /^HTTP (\d{3})(?:;|$)/u.exec(typeof attempt?.observed === 'string' ? attempt.observed : '');
@@ -127,6 +134,12 @@ export async function runAttackChecks(input) {
   const results = [];
   for (const [attackId, stage, path, expected] of plan) {
     results.push(attackResult(attackId, stage, expected, await requestObservation(new URL(path, app), {}, attackId)));
+  }
+
+  // 이 제출 묶음은 로그인 없는 읽기 요청만 보냅니다. 아래 총공세 시험은 로그인 토큰·회수된 신원·쓰기 요청이
+  // 필요해 이번에 보내지 않았습니다. 숨기거나 막음으로 세지 않고 observed·result 를 not_run 으로 그대로 남깁니다.
+  for (const [attackId, stage, expected] of UNSENT_CHECKS) {
+    results.push(attackResult(attackId, stage, expected, NOT_RUN));
   }
   return results;
 }
