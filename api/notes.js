@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { isNoteResourceId } from '../src/resource-ids.mjs';
+import { describeValue, writeDiag } from '../src/diag-log.mjs';
 import { BACKUP_LIKE, backupCurrentNote, isBackupTitle, recordBackup } from '../src/note-backup.mjs';
 
 let services;
@@ -71,6 +72,38 @@ function notFound(response) {
 }
 
 export default async function handler(request, response) {
+  const pending = [];
+  const originalStatus = response.status.bind(response);
+  let code = 200;
+  response.status = (value) => { code = value; return originalStatus(value); };
+  const originalJson = response.json.bind(response);
+  response.json = (payload) => {
+    if (request.method !== 'GET' || code >= 400) {
+      pending.push(handleDiag(request, code, payload));
+    }
+    return originalJson(payload);
+  };
+  try {
+    return await handleNotes(request, response);
+  } finally {
+    await Promise.allSettled(pending);
+  }
+}
+
+async function handleDiag(request, code, payload) {
+  try {
+    const { supabase } = getServices();
+    await writeDiag(supabase, '00000000-0000-4000-8000-000000000000', {
+      at: new Date().toISOString(), route: 'notes', method: request.method, status: code,
+      query: Object.keys(request.query ?? {}), body: describeValue(request.body),
+      error: payload && typeof payload === 'object' ? (payload.error ?? null) : null,
+    });
+  } catch {
+    // 진단 기록 실패는 무시합니다.
+  }
+}
+
+async function handleNotes(request, response) {
   response.setHeader('Cache-Control', 'no-store');
 
   let currentServices;

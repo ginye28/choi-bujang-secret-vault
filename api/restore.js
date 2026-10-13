@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { restoreNote } from '../src/restore-note.mjs';
+import { describeValue, writeDiag } from '../src/diag-log.mjs';
 
 let services;
 
@@ -62,5 +63,10 @@ export default async function handler(request, response) {
   const body = requestBody(request);
   if (body === null) return response.status(400).json({ error: 'INVALID_BODY' });
   const result = await restoreNote({ supabase: currentServices.supabase, identity, body });
+  await writeDiag(currentServices.supabase, identity.userId, {
+    at: new Date().toISOString(), route: 'restore', method: request.method, who: identity.identity ?? identity.kind,
+    body: describeValue(body), status: result.status, error: result.json.error ?? null, reason: result.json.reason ?? null,
+    restored: result.json.restored ?? null, changes: result.json.changes ?? null,
+  });
   return response.status(result.status).json(result.json);
 }
