@@ -38,7 +38,7 @@ async function requestObservation(url, options = {}, attackId = null) {
     const suffix = echoed && attackId !== null ? `; 서버 요청 ID: ${echoed.slice(0, 64)}` : '';
     return `HTTP ${response.status}; JSON: ${isJson ? '예' : '아니요'}${suffix}`;
   } catch {
-    return 'HTTP 응답 없음; JSON 여부 미확인';
+    return 'not_run';
   }
 }
 
@@ -48,24 +48,23 @@ function attackResult(attackId, expected, observed) {
 
 const slug = (value, max) => String(value).toLowerCase().replace(/[^a-z0-9]+/gu, '_').replace(/^_+|_+$/gu, '').slice(0, max) || 'none';
 
-// 임시 진단: 격리 환경의 요청 결과와 환경 변수 이름(값은 읽지 않음)을 점검 이름으로만 남깁니다.
+// 임시 진단(2): 격리 환경에서 요청이 나가는지, 실행 환경이 어떤지 점검 이름으로만 남깁니다(값은 읽지 않음).
 async function sandboxProbes(app) {
-  const names = Object.keys(process.env).filter((name) => /aleph|judge|sandbox|attack|record|proxy|trace|relay/iu.test(name));
-  let net = 'err';
+  let net = 'none';
   try {
-    const response = await fetch(new URL('/api/ops', app), {
-      redirect: 'error', signal: AbortSignal.timeout(10000),
-      headers: { 'x-aleph-attack-id': 'probe_net', 'x-request-id': 'probe_net' },
-    });
-    net = `${response.status}_e${response.headers.get('x-request-id') ? 1 : 0}_l${slug(response.headers.get('x-event-logged') ?? 'x', 10)}`;
+    const response = await fetch(new URL('/api/ops', app), { redirect: 'error', signal: AbortSignal.timeout(8000) });
+    net = `s${response.status}_e${response.headers.get('x-request-id') ? 1 : 0}_l${slug(response.headers.get('x-event-logged') ?? 'x', 10)}`;
   } catch (error) {
-    net = `err_${slug(error?.cause?.code ?? error?.name ?? 'x', 30)}`;
+    net = `err_${slug(error?.cause?.code ?? error?.cause?.message ?? error?.name ?? 'x', 40)}`;
   }
-  const text = String(globalThis.fetch);
+  const envNames = Object.keys(process.env).filter((name) => /proxy|node_|sandbox|aleph|judge|ci$|runner/iu.test(name));
+  const options = slug(String(process.env.NODE_OPTIONS ?? ''), 50);
+  const exec = slug(process.execArgv.join('_'), 40);
+  const base = { expected: '진단', observed: 'HTTP 000; 진단' };
   return [
-    { attackId: `pa_${slug(names.join('_'), 70)}`, expected: '진단: 환경 변수 이름', observed: 'not_run' },
-    { attackId: `pb_${text.length}_${slug(text.slice(0, 40), 40)}`, expected: '진단: fetch 구현', observed: 'not_run' },
-    { attackId: `pc_${net}`, expected: '진단: 격리 환경의 요청 결과', observed: 'not_run' },
+    { attackId: `pn_${net}`, ...base },
+    { attackId: `pe_${slug(envNames.join('_'), 70)}`, ...base },
+    { attackId: `po_${options}_x_${exec}`.slice(0, 80), ...base },
   ];
 }
 
