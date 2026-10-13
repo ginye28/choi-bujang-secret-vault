@@ -96,7 +96,7 @@
           <p id="ops-recovery"></p>
           <ul id="ops-versions"></ul>
           <h3>총공세</h3>
-          <p id="ops-assault"></p>
+          <p id="ops-totals"></p>
           <h3>규칙별 거부 수</h3>
           <ul id="ops-deny"></ul>
           <h3>최근 사건 50줄</h3>
@@ -414,8 +414,10 @@
         versions.append(item);
       }
       const events = report.events;
-      const assault = events.assault;
-      opsText('#ops-assault', `총공세 막음 ${assault.blocked} / ${assault.total} · 허용된 기록 ${assault.allowed} · 서버 오류 ${assault.errors} · 미실행 ${assault.notRun} (서버가 실제로 기록한 응답만 집계)`);
+      const judge = report.judgeSuite;
+      const outcomes = events.outcomes;
+      const tagged = events.tagged;
+      opsText('#ops-totals', `총공세 41종 시험: ${judge.status} — 결과 기록 ${judge.recorded}건, 막음·통과로 세지 않음 · 서버 요청 기록 ${events.recordedTotal}건: 거부 ${outcomes.blocked} · 허용 ${outcomes.allowed} · 서버 오류 ${outcomes.errors} · 점검 이름이 붙은 요청 ${tagged.checks}종: 거부 ${tagged.blocked} · 허용 ${tagged.allowed} · 오류 ${tagged.errors}`);
       const deny = document.querySelector('#ops-deny');
       deny.replaceChildren();
       if (events.denyByRule.length === 0) {

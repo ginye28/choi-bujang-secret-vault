@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 // 12단계 제출 묶음은 읽기(GET·HEAD) 요청만 보낼 수 있습니다. 쓰기 요청 점검은 여기에 두지 않습니다.
@@ -16,36 +16,26 @@ function publicApp(config) {
   return app;
 }
 
-// 요청마다 새 요청 ID(randomUUID)를 보내고, 응답 본문의 sha256(본문 자체는 남기지 않음)과 확인 시각을
-// observed 에 적습니다. 서버는 같은 요청 ID 로 응답 해시를 기록하므로 서버 기록과 맞춰 볼 수 있습니다.
-// 요청을 보내지 못한 점검은 observed 를 not_run 으로 적습니다.
-async function requestObservation(url, options = {}, attackId = null) {
-  const requestId = randomUUID();
-  const tagged = attackId === null ? {} : { 'x-request-id': requestId, 'x-aleph-attack-id': attackId };
+// 심판 실행기가 같은 응답을 독립적으로 관측할 수 있도록, 요청마다 fetch 옵션 alephEvidence 에
+// 점검 이름(caseId)과 요청 키를 연결합니다(ALEPH 공개 통과 표본 byteback-sample-pass 와 같은 방식).
+// 이 정보는 요청 헤더나 URL에 넣지 않습니다. 일반 Node fetch 는 모르는 옵션을 무시합니다.
+// observed 에는 관측한 사실(HTTP 상태, JSON 여부)만 적고, 요청을 보내지 못한 점검은 not_run 으로 적습니다.
+async function requestObservation(url, options = {}, attackId) {
   try {
     const response = await fetch(url, {
       ...options,
-      headers: { ...(options.headers ?? {}), ...tagged },
       redirect: 'error',
       signal: AbortSignal.timeout(10000),
+      alephEvidence: { caseId: attackId, requestKey: 'read' },
     });
-    let text = '';
-    try {
-      text = typeof response.text === 'function' ? await response.text() : JSON.stringify(await response.json());
-    } catch {
-      // 본문을 읽지 못해도 상태만으로 기록합니다.
-    }
     let isJson = false;
     try {
-      JSON.parse(text);
+      await response.json();
       isJson = true;
     } catch {
-      // JSON 이 아니면 아니요로 기록합니다. 본문은 남기지 않습니다.
+      // JSON 여부만 남기고 본문은 남기지 않습니다.
     }
-    const digest = createHash('sha256').update(text, 'utf8').digest('hex');
-    const checkedAt = new Date().toISOString();
-    const base = `HTTP ${response.status}; JSON: ${isJson ? '예' : '아니요'}`;
-    return attackId === null ? base : `${base}; 요청 ID: ${requestId}; 응답 sha256: ${digest}; 확인 시각: ${checkedAt}`;
+    return `HTTP ${response.status}; JSON: ${isJson ? '예' : '아니요'}`;
   } catch {
     return 'not_run';
   }
@@ -55,8 +45,21 @@ function attackResult(attackId, expected, observed) {
   return { attackId, expected, observed };
 }
 
-export async function runAttackChecks(config) {
-  if (!Number.isInteger(config.step) || config.step < 1) {
+// 실행기가 배포 주소 문자열만 넘겨도 같은 점검을 하도록, 나머지 설정은 aleph.config.json 에서 읽습니다.
+function resolveConfig(input) {
+  if (typeof input !== 'string') return input;
+  let saved = {};
+  try {
+    saved = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
+  } catch {
+    // 설정 파일을 읽지 못하면 넘겨받은 배포 주소만 씁니다.
+  }
+  return { ...saved, step: Number.isInteger(saved.step) ? saved.step : 12, publicAppUrl: input };
+}
+
+export async function runAttackChecks(input) {
+  const config = resolveConfig(input);
+  if (!Number.isInteger(config?.step) || config.step < 1) {
     throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   }
   const app = publicApp(config);

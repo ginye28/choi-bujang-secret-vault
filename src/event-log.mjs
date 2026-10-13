@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 // 12단계: 서버가 실제로 받은 API 요청과 그 결과를 남기는 "서버 요청 기록"입니다.
-// - 탈환 작전실의 최근 사건 50줄·규칙별 거부 수·총공세 "막음 n / 41"은 이 기록에서만 계산합니다.
+// - 탈환 작전실의 최근 사건 50줄·규칙별 거부 수·결과별 건수는 이 기록에서만 셉니다.
+// - 심판의 41종 시험 결과는 이 기록에 없으므로 막음·통과로 세지 않고 미실행으로 둡니다.
 // - 기록에는 요청 ID, 시각, 방식, 가린 경로(:id), 응답 상태, 이유 코드, 점검 이름(attackId), 행위자 종류와
 //   짧은 가명 값만 둡니다. 메모 제목·본문, 토큰, 이메일, 헤더 값, 전체 자료 ID는 남기지 않습니다.
 // - 기록은 훨씬 큰 메모 테이블의 비공개 접두사 행입니다(메모 API 목록에는 나오지 않습니다).
@@ -142,26 +143,31 @@ export function summarizeEvents(events, viewerRef = null) {
     const rule = event.reason ?? `http_${event.status}`;
     byRule.set(rule, (byRule.get(rule) ?? 0) + 1);
   }
-  const blockedIds = new Set();
-  const allowedIds = new Set();
-  const errorIds = new Set();
+  // 결과별 건수: 기록된 응답을 그대로 셉니다(세 값의 합은 recordedTotal 과 같습니다).
+  const outcomes = { blocked: 0, allowed: 0, errors: 0 };
   for (const event of visible) {
-    if (!event.attackId) continue;
-    if (event.outcome === 'blocked') blockedIds.add(event.attackId);
-    else if (event.outcome === 'allowed') allowedIds.add(event.attackId);
-    else errorIds.add(event.attackId);
+    if (event.outcome === 'blocked') outcomes.blocked += 1;
+    else if (event.outcome === 'allowed') outcomes.allowed += 1;
+    else outcomes.errors += 1;
   }
-  // 막음: 기록에 거부 결과가 있고 같은 이름으로 허용된 기록은 없는 점검 이름만 셉니다.
-  const blocked = [...blockedIds].filter((id) => !allowedIds.has(id)).length;
-  const allowed = [...allowedIds].filter((id) => !blockedIds.has(id)).length;
-  const errors = [...errorIds].filter((id) => !blockedIds.has(id) && !allowedIds.has(id)).length;
-  const notRun = Math.max(0, TOTAL_ATTACKS - blocked - allowed - errors);
+  // 점검 이름이 붙은 요청: 이름마다 가장 최근 기록의 결과 하나만 셉니다(기록은 최신순).
+  const latest = new Map();
+  for (const event of visible) {
+    if (event.attackId && !latest.has(event.attackId)) latest.set(event.attackId, event.outcome);
+  }
+  const tagged = { checks: latest.size, blocked: 0, allowed: 0, errors: 0 };
+  for (const outcome of latest.values()) {
+    if (outcome === 'blocked') tagged.blocked += 1;
+    else if (outcome === 'allowed') tagged.allowed += 1;
+    else tagged.errors += 1;
+  }
   return {
     recordedTotal: visible.length,
     recent,
     denyByRule: [...byRule.entries()].map(([rule, count]) => ({ rule, count }))
       .sort((a, b) => b.count - a.count || a.rule.localeCompare(b.rule)).slice(0, 20),
-    assault: { total: TOTAL_ATTACKS, blocked: Math.min(blocked, TOTAL_ATTACKS), allowed, errors, notRun },
+    outcomes,
+    tagged,
   };
 }
 

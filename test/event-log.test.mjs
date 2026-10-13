@@ -52,7 +52,7 @@ test('기록에는 토큰·이메일·본문 없이 가린 값만 남는다', ()
   assert.equal(outcomeOf(500), 'error');
 });
 
-test('요약: 최근 50줄, 규칙별 거부 수, 막음 n / 41 과 미실행을 실제 기록으로만 센다', () => {
+test('요약: 최근 50줄, 규칙별 거부 수, 결과별 건수를 실제 기록으로만 센다', () => {
   const make = (index, extra) => ({
     v: 1, requestId: `r${index}`, at: `2026-10-13T00:${String(index % 60).padStart(2, '0')}:00Z`, method: 'GET',
     route: '/api/notes', status: 401, outcome: 'blocked', reason: 'LOGIN_REQUIRED', attackId: null,
@@ -65,15 +65,15 @@ test('요약: 최근 50줄, 규칙별 거부 수, 막음 n / 41 과 미실행을
   events.push(make(104, { attackId: 'a_other', status: 200, outcome: 'allowed', reason: null, actor: { kind: 'authenticated', ref: 'someoneelse' } }));
   const summary = summarizeEvents(events, 'me000000');
   assert.equal(summary.recent.length, 50);
-  assert.equal(summary.assault.total, TOTAL_ATTACKS);
-  assert.equal(summary.assault.blocked, 2);
-  assert.equal(summary.assault.allowed, 1);
-  assert.equal(summary.assault.notRun, TOTAL_ATTACKS - 3);
+  assert.deepEqual(summary.tagged, { checks: 3, blocked: 2, allowed: 1, errors: 0 });
+  assert.deepEqual(summary.outcomes, { blocked: 63, allowed: 1, errors: 0 });
+  assert.equal(summary.outcomes.blocked + summary.outcomes.allowed + summary.outcomes.errors, summary.recordedTotal);
+  assert.equal('assault' in summary, false);
   assert.deepEqual(summary.denyByRule[0], { rule: 'LOGIN_REQUIRED', count: 63 });
   // 다른 사용자의 로그인 기록은 보이지 않는다.
   assert.equal(summary.recordedTotal, events.length - 1);
   assert.equal(JSON.stringify(summary).includes('someoneelse'), false);
-  assert.equal(summarizeEvents([], null).assault.notRun, TOTAL_ATTACKS);
+  assert.deepEqual(summarizeEvents([], null).outcomes, { blocked: 0, allowed: 0, errors: 0 });
 });
 
 test('기록 성공 여부를 모르는 상태는 명시적으로 헤더에 구분한다', async () => {
@@ -110,15 +110,17 @@ test('작전실은 가린 서버 기록과 일치하는 요약만 제공하고 �
   assert.equal(report.events.recent[0].route, '/api/notes/:id');
   assert.equal(report.events.recent[0].requestId, 'server-request-42');
   assert.equal(report.events.denyByRule.find((item) => item.rule === 'LOGIN_REQUIRED')?.count, 1);
-  assert.deepEqual(report.events.assault, { total: 41, blocked: 1, allowed: 0, errors: 0, notRun: 40 });
+  assert.deepEqual(report.events.outcomes, { blocked: 1, allowed: 0, errors: 0 });
+  assert.deepEqual(report.judgeSuite, { ...report.judgeSuite, total: TOTAL_ATTACKS, recorded: 0, status: '미실행' });
   const json = JSON.stringify(report.events);
   assert.equal(json.includes(secretId), false);
   assert.equal(json.includes('private=query'), false);
   assert.equal(json.includes('가상 메모 본문'), false);
   const page = read('public/index.html');
-  for (const label of ['최근 사건 50줄', '규칙별 거부 수', '총공세 막음']) assert.ok(page.includes(label), label);
+  for (const label of ['최근 사건 50줄', '규칙별 거부 수', '총공세 41종 시험']) assert.ok(page.includes(label), label);
   assert.ok(page.includes('events.recordedTotal'));
-  assert.ok(page.includes('assault.blocked'));
+  assert.ok(page.includes('outcomes.blocked'));
+  assert.equal(page.includes('assault'), false);
   assert.ok(page.includes('item.route'));
   assert.ok(page.includes('item.reason'));
   assert.equal(page.includes('innerHTML'), false);
@@ -131,16 +133,43 @@ test('작전실 기록을 읽지 못했을 때는 서버 기록 상태와 공격
   const rows = await runLocalChecks();
   const report = buildOpsReport({ rows, recovery: [], devices: [] });
   assert.equal(report.events.available, false);
-  assert.equal(report.events.assault.notRun, TOTAL_ATTACKS);
-  assert.equal(report.events.assault.blocked, 0);
+  assert.deepEqual(report.events.outcomes, { blocked: 0, allowed: 0, errors: 0 });
+  assert.equal(report.judgeSuite.status, '미실행');
   const page = read('public/index.html');
   assert.ok(page.includes('서버 요청 기록을 읽지 못했습니다(미실행).'));
 });
 
-test('제출 묶음 점검은 읽기 요청만 보내고 점검 이름을 붙인다', () => {
+test('제출 묶음 점검은 읽기 요청만 보내고 alephEvidence 로 점검 이름을 연결한다', async () => {
   const source = read('src/attack-check.mjs');
   assert.equal(/method:\s*'(?:POST|PUT|PATCH|DELETE)'/u.test(source), false);
-  assert.ok(source.includes("'x-aleph-attack-id': attackId"));
+  const { runAttackChecks } = await import('../src/attack-check.mjs');
+  const originalFetch = globalThis.fetch;
+  const seen = [];
+  try {
+    globalThis.fetch = async (url, init = {}) => {
+      seen.push({ url: String(url), init });
+      return new Response(JSON.stringify({ error: 'UNAUTHORIZED' }), { status: 401, headers: { 'content-type': 'application/json' } });
+    };
+    const results = await runAttackChecks({
+      step: 12, publicAppUrl: 'https://student-defense.vercel.app/', originalApiUrl: 'https://db.example.org/rest/v1/notes',
+    });
+    assert.equal(seen.length, results.length);
+    results.forEach((result, index) => {
+      const { init, url } = seen[index];
+      assert.deepEqual(init.alephEvidence, { caseId: result.attackId, requestKey: 'read' });
+      assert.equal(init.method ?? 'GET', 'GET');
+      const headerNames = Object.keys(init.headers ?? {}).map((name) => name.toLowerCase());
+      assert.equal(headerNames.some((name) => name.includes('attack') || name === 'x-request-id'), false);
+      assert.equal(url.includes(result.attackId), false);
+      assert.equal(result.observed, 'HTTP 401; JSON: 예');
+    });
+    globalThis.fetch = async () => { throw new TypeError('network blocked'); };
+    const offline = await runAttackChecks('https://student-defense.vercel.app/');
+    assert.ok(offline.length > 0);
+    assert.ok(offline.every((result) => result.observed === 'not_run'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('서버 기록은 응답 본문의 sha256만 남기고 본문은 남기지 않는다', async () => {
@@ -153,9 +182,9 @@ test('서버 기록은 응답 본문의 sha256만 남기고 본문은 남기지 
   assert.equal(summary.recent[0].sha256, event.sha256);
 });
 
-test('제출 묶음 점검은 randomUUID 요청 ID·응답 sha256·확인 시각을 observed 에 적는다', () => {
+test('제출 묶음 점검의 observed 에는 관측한 사실만 적고 계산한 값을 넣지 않는다', () => {
   const source = read('src/attack-check.mjs');
-  for (const word of ['randomUUID', 'createHash', "'x-request-id': requestId", '응답 sha256', '확인 시각']) {
-    assert.ok(source.includes(word), word);
-  }
+  assert.ok(source.includes('`HTTP ${response.status}; JSON: '));
+  assert.ok(source.includes("return 'not_run';"));
+  assert.equal(source.includes('createHash'), false);
 });

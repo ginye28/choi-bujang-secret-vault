@@ -101,7 +101,7 @@ test('화면은 보호된 /api/ops 응답을 textContent로 표시하고 가상 
   assert.ok(page.includes('탈환 작전실'));
   assert.ok(page.includes("'/api/ops'"));
   assert.ok(page.includes('events.recordedTotal'));
-  assert.ok(page.includes('assault.blocked'));
+  assert.ok(page.includes('judge.status'));
   assert.ok(page.includes('item.route'));
   assert.ok(page.includes('item.reason'));
   assert.equal(page.includes('localStorage'), false);

@@ -3,6 +3,7 @@ import { decide, resetNoteOwners, RULE_IDS } from './decider.mjs';
 import { detect } from './detect.mjs';
 import { bodyDigest, checkDeviceProof, issueTicket } from './device-proof.mjs';
 import { buildPolicyCopy, diffPolicy, SAFE_POLICY, verifyPolicyCopy } from './policy.mjs';
+import { TOTAL_ATTACKS } from './event-log.mjs';
 
 // 12단계 탈환 작전실: 1~11단계에서 만든 규칙을 한 곳에 모아 "실제로 실행한 결과"만 보여 줍니다.
 // - 실행한 점검은 이 모듈이 지금 판정기·탐지·기기 서명 코드를 직접 호출해 얻은 값입니다(요청 ID·시각 포함).
@@ -306,14 +307,16 @@ export function buildOpsReport({ rows, deployedRows = [], recovery, devices, eve
       policyCopy: { ok: verdict.ok, version: verdict.ok ? verdict.version : null, sha256: verdict.ok ? verdict.sha256.slice(0, 16) : null },
     },
     verification,
-    // 서버가 실제로 받은 요청의 기록(최근 50줄·규칙별 거부 수·총공세 막음 n / 41). 위 점검 표와 별개입니다.
+    // 서버가 실제로 받은 요청의 기록(최근 50줄·규칙별 거부 수·결과별 건수). 위 점검 표와 별개입니다.
     events: events ?? {
       available: false, recordedTotal: 0, recent: [], denyByRule: [],
-      assault: { total: 41, blocked: 0, allowed: 0, errors: 0, notRun: 41 },
+      outcomes: { blocked: 0, allowed: 0, errors: 0 },
+      tagged: { checks: 0, blocked: 0, allowed: 0, errors: 0 },
     },
+    // 심판의 41종 시험 결과는 학생 환경에 기록이 없습니다. 막음·통과로 세지 않고 미실행으로만 표시합니다.
     judgeSuite: {
-      total: 41, runByStudent: 0,
-      note: '심판의 41종 시험은 운영 측이 실행합니다. 이 표의 점검은 학생이 직접 실행한 것만 세며, 41종의 통과를 대신하지 않습니다.',
+      total: TOTAL_ATTACKS, runByStudent: 0, recorded: 0, status: STATUS_NOT_RUN,
+      note: '심판의 41종 시험은 운영 측이 실행합니다. 이 화면에는 그 결과 기록이 없으므로 41종은 모두 미실행이며, 막음·통과로 세지 않습니다.',
     },
   };
 }
