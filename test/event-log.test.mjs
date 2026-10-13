@@ -76,18 +76,19 @@ test('요약: 최근 50줄, 규칙별 거부 수, 막음 n / 41 과 미실행을
   assert.equal(summarizeEvents([], null).assault.notRun, TOTAL_ATTACKS);
 });
 
-test('감싼 핸들러는 응답을 보내기 전에 기록을 남기고 요청 ID 를 돌려준다', async () => {
-  const sent = [];
+test('기록 성공 여부를 모르는 상태는 명시적으로 헤더에 구분한다', async () => {
   const headers = {};
+  const sent = [];
   const response = {
     setHeader: (name, value) => { headers[name] = value; },
     status(code) { sent.push(['status', code]); return this; },
     json(body) { sent.push(['json', body]); return this; },
   };
-  const handler = async (_request, res) => res.status(401).json({ error: 'UNAUTHORIZED', reason: 'LOGIN_REQUIRED' });
-  const wrapped = withEventLog(handler);
+  const wrapped = withEventLog(async (_request, res) => res.status(401).json({ error: 'UNAUTHORIZED', reason: 'LOGIN_REQUIRED' }));
   await wrapped({ method: 'GET', url: '/api/notes', headers: { 'x-request-id': 'probe_two' } }, response);
   assert.equal(headers['X-Request-Id'], 'probe_two');
+  // 테스트 프로세스에는 서버 DB 클라이언트가 없으므로 실제 기록 성공으로 표시하지 않습니다.
+  assert.equal(headers['X-Event-Logged'], 'no-client');
   assert.deepEqual(sent, [['status', 401], ['json', { error: 'UNAUTHORIZED', reason: 'LOGIN_REQUIRED' }]]);
 });
 
