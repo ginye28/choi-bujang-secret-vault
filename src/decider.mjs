@@ -196,6 +196,11 @@ function zoneDecision(request) {
       && !ownerMarkerMatchesSubject(hit.id, request.subjectId)) {
     return { allow: false, reasonCode: 'zone_other_owner', ruleId: RULE_IDS[2] };
   }
+  // [실험] 자료 ID에 요청자의 subjectId가 들어 있을 때만 자기 메모로 인정합니다.
+  if (hit.service === 'notes' && hit.template === hit.zone.item
+      && !hit.id.toLowerCase().includes(String(request.subjectId).toLowerCase())) {
+    return { allow: false, reasonCode: 'zone_other_owner', ruleId: RULE_IDS[2] };
+  }
   return { allow: true, ruleId: hit.service === 'notes' ? RULE_IDS[2] : RULE_IDS[3] };
 }
 
