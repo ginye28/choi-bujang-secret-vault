@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
+import { isNoteResourceId } from '../src/resource-ids.mjs';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 let services;
 
 function getServices() {
@@ -55,6 +55,11 @@ function noteFromRow(row) {
   return { id: row.id, title: row.title, body: row.content };
 }
 
+function notFound(response) {
+  // Same response for absent and non-owned notes prevents ID enumeration.
+  return response.status(404).json({ error: 'NOT_FOUND', reason: 'OWNER_MISMATCH_OR_NOT_FOUND' });
+}
+
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
 
@@ -72,12 +77,12 @@ export default async function handler(request, response) {
     identity = null;
   }
   if (!identity?.userId) {
-    return response.status(401).json({ error: 'UNAUTHORIZED' });
+    return response.status(401).json({ error: 'UNAUTHORIZED', reason: 'LOGIN_REQUIRED' });
   }
 
   const id = queryId(request);
   const hasId = id !== undefined;
-  if (hasId && (typeof id !== 'string' || !UUID.test(id))) {
+  if (hasId && !isNoteResourceId(id)) {
     return response.status(400).json({ error: 'INVALID_ID' });
   }
 
@@ -104,14 +109,14 @@ export default async function handler(request, response) {
         .eq('owner_id', identity.userId)
         .maybeSingle();
       if (error) return response.status(500).json({ error: 'NOTES_SERVICE_UNAVAILABLE' });
-      if (!data) return response.status(404).json({ error: 'NOT_FOUND' });
+      if (!data) return notFound(response);
       return response.status(200).json(noteFromRow(data));
     }
 
     if (method === 'POST' && !hasId) {
       const body = requestBody(request);
       if (!isNoteBody(body)) return response.status(400).json({ error: 'INVALID_BODY' });
-      if (body.id !== undefined && (typeof body.id !== 'string' || !UUID.test(body.id))) {
+      if (body.id !== undefined && !isNoteResourceId(body.id)) {
         return response.status(400).json({ error: 'INVALID_ID' });
       }
 
@@ -146,7 +151,7 @@ export default async function handler(request, response) {
         .select('id')
         .maybeSingle();
       if (error) return response.status(500).json({ error: 'NOTES_SERVICE_UNAVAILABLE' });
-      if (!data) return response.status(404).json({ error: 'NOT_FOUND' });
+      if (!data) return notFound(response);
       return response.status(200).json({ id: data.id });
     }
 
@@ -159,7 +164,7 @@ export default async function handler(request, response) {
         .select('id')
         .maybeSingle();
       if (error) return response.status(500).json({ error: 'NOTES_SERVICE_UNAVAILABLE' });
-      if (!data) return response.status(404).json({ error: 'NOT_FOUND' });
+      if (!data) return notFound(response);
       return response.status(200).json({ id: data.id });
     }
 

@@ -7,6 +7,10 @@
     {
       "source": "/api/notes/:id",
       "destination": "/api/notes?id=:id"
+    },
+    {
+      "source": "/api/announcements/:id",
+      "destination": "/api/announcements?id=:id"
     }
   ],
   "headers": [

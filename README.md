@@ -1,4 +1,17 @@
-# 자료실 — 7단계 저장점
+# 자료실 — 8단계 저장점
+
+## 8단계: 자료마다 갈 수 있는 구역을 나눕니다
+
+- **자원 ID**: 메모는 기존 UUID, 강사 공지는 `announcement_<UUID>`로 구분합니다. 메모 API는 공지 ID를, 공지 API는 메모 ID를 `400 INVALID_ID`로 거부합니다.
+- **판정기 구역 규칙** (`src/decider.mjs`): 엔진이 확인한 `service`·`method`·`route`·`path`로만 구역을 고르고 쿼리 값은 기능을 고르는 데 쓰지 않습니다.
+  - `GET·POST /notes`, `GET·PUT·DELETE /notes/:id` → 허용(규칙 `zone_own_notes`). 메모의 소유자 확인은 판정 계약에 소유 관계가 없어서 자료 API가 합니다.
+  - `GET /announcements`, `GET /announcements/:id` → 허용(규칙 `zone_announcements`).
+  - 공지에 대한 `PUT·POST·PATCH·DELETE` → 거부(`announcement_write_denied`). 판정 계약에는 검증된 강사 역할이 없어서 일반 학생은 공지를 수정할 수 없습니다.
+  - 알 수 없는 서비스·경로, `route`와 `path`의 깊이가 다른 요청, `:id` 자리에 온 기능 단어(`export` 등)는 거부(`route_not_allowed`).
+  - 이전 단계 규칙은 그대로입니다. 미등록 기기는 구역과 관계없이 먼저 거부하고, 복합 이상 접속은 추가 확인합니다.
+- **자료 API 재확인**: `/api/notes`는 검증된 로그인 사용자의 ID와 저장된 `owner_id`를 서버에서 대조하며 다른 사용자의 메모는 `404 NOT_FOUND`(`OWNER_MISMATCH_OR_NOT_FOUND`)로 응답합니다. `/api/announcements`는 로그인한 사용자가 읽을 수 있고, 수정 요청은 서버에 저장된 강사 권한(`app_metadata.role`)이 없으면 `403 INSTRUCTOR_REQUIRED`입니다. 화면 메뉴나 요청 본문의 `role`은 보지 않습니다.
+- **확인 순서**: `npm run decider:test`, `npm run fixture:7`, `node --test test/decider-zone.test.mjs test/resource-ids.test.mjs test/instructor-access.test.mjs`. 가상 요청 연습이며 심판 판정이 아닙니다.
+- **미실행**: `db/announcements.sql`의 Supabase 적용과 배포 API의 실제 호출 결과는 이 문서 작성 시점에 확인하지 않았습니다.
 
 ## 7단계: 평소와 다른 접속은 다시 확인합니다
 
@@ -37,22 +50,27 @@
 - 브라우저는 로그인·회원가입을 `/api/auth`, 메모 조회·추가·수정·삭제를 `/api/notes` 서버 함수에 요청하며 Supabase를 직접 호출하지 않습니다. 화면 코드에는 Supabase 키가 없습니다.
 - `/api/auth`가 서버에서 Supabase Auth에 인증 요청을 전달하고, 성공한 로그인 토큰은 브라우저의 `sessionStorage`에 저장됩니다. `/api/notes` 요청은 이 토큰을 Bearer 인증으로 전달합니다. 로그아웃하면 브라우저 저장소를 비웁니다.
 - `/api/notes`는 로그인 사용자를 확인한 뒤 서버에서 `training_notes`를 조회·변경하고, 메모 소유자 조건을 적용합니다. 다른 사용자의 메모는 `404 {"error":"NOT_FOUND"}`로 응답합니다.
+- 메모 ID는 기존 UUID 그대로 유지합니다. 강사 공지는 새 `instructor_announcements` 자원에 저장되며 API 응답과 주소에서는 `announcement_<UUID>` 형식을 써서 메모 ID와 구분합니다. 공지 조회 API는 `/api/announcements`이며 로그인된 사용자에게 읽기만 제공합니다. 화면 메뉴는 변경하지 않았습니다.
 
 ## 다시 실행하기
 
-1. Supabase **SQL Editor**에서 아래 파일을 순서대로 실행하세요.
+1. Supabase **SQL Editor**에서 아래 파일을 순서대로 실행하세요. 이미 실행한 DB라면 `db/announcements.sql`만 추가로 실행하면 됩니다. 기존 `training_notes`와 메모는 바뀌지 않습니다.
    1. `db/schema.sql`
    2. `db/policies.sql`
    3. `db/revoke-direct.sql`
+   4. `db/announcements.sql` (8단계: 강사 공지 전용 테이블)
 2. `db/revoke-direct.sql`은 `public.training_notes`에서만 `PUBLIC`, `anon`, `authenticated`의 직접 테이블 권한을 회수합니다. 이 파일은 다른 테이블, RLS 설정·정책, `service_role` 권한을 변경하지 않습니다.
 3. `db/revoke-direct.sql`의 `REVOKE` 앞 확인 쿼리 결과와 뒤 확인 쿼리 결과를 비교하세요. 뒤 결과에서 `anon`과 `authenticated`의 `can_select`, `can_insert`, `can_update`, `can_delete`는 모두 `false`여야 합니다. ACL 확인 결과에는 `PUBLIC`, `anon`, `authenticated` 권한이 없어야 하고, `service_role` 결과는 적용 전과 같아야 합니다. 역할 멤버십 등으로 간접 권한을 추가했다면 유효 권한 결과가 달라질 수 있으므로 따로 검토하세요.
-4. Vercel 프로젝트의 **Settings → Environment Variables**에서 `SUPABASE_URL`과 서버 전용 `SUPABASE_SECRET_KEY`를 직접 입력하세요. 비밀값은 코드나 문서에 기록하지 마세요. `/api/auth`는 서버에서 Supabase Auth REST를 호출하며 공개 키를 사용합니다.
+4. `db/announcements.sql` 확인 결과에서 `anon_can_select`와 `authenticated_can_select`는 `false`, `service_role_can_select`는 `true`여야 합니다.
+5. Vercel 프로젝트의 **Settings → Environment Variables**에서 `SUPABASE_URL`과 서버 전용 `SUPABASE_SECRET_KEY`를 직접 입력하세요. 비밀값은 코드나 문서에 기록하지 마세요. `/api/auth`는 서버에서 Supabase Auth REST를 호출하며 공개 키를 사용합니다.
+6. 공지 조회에는 로그인한 뒤 `GET /api/announcements`를, 특정 공지 조회에는 `GET /api/announcements/announcement_<UUID>`를 사용합니다. 메모 API 경로와 기존 메모 ID는 바뀌지 않았습니다.
 
 ## 남은 약점
 
 - 옛 공개 커밋과 배포에는 과거 노출 기록이 남아 있습니다. 현재 구현이나 새 배포만으로 과거 기록이 사라지지는 않습니다.
 - `/api/auth`에는 속도 제한이 없습니다.
-- 메모 API의 서버 전용 키는 Vercel의 `SUPABASE_SECRET_KEY` 환경변수 하나에 의존합니다. 이 값은 브라우저 코드에 넣지 마세요.
+- 메모 및 공지 API의 서버 전용 키는 Vercel의 `SUPABASE_SECRET_KEY` 환경변수 하나에 의존합니다. 이 값은 브라우저 코드에 넣지 마세요.
+- 강사 공지 등록·수정·삭제를 위한 관리자 인증과 입력 API는 구현하지 않았습니다. DB의 기존 공지 내용을 이 변경에서 만들거나 옮기지 않았습니다.
 
 SQL 실행, 환경변수 설정, 배포 및 화면 동작 확인은 이 문서 수정 과정에서 수행하지 않았습니다.
 
