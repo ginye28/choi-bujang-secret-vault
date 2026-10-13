@@ -97,22 +97,22 @@
     const notesStatus = document.querySelector('#notes-status');
     const notesList = document.querySelector('#notes-list');
     const buttons = [...document.querySelectorAll('button')];
-    const TOKEN_KEY = 'access_token';
-    const EMAIL_KEY = 'user_email';
+    const TOKEN_SLOT = 'access_token';
+    const EMAIL_SLOT = 'user_email';
     let notesRequestId = 0;
 
-    // 요청 서명 정보는 이 화면의 메모리에서만 만들고 어디에도 저장하지 않습니다(새로고침하면 다시 승인 요청).
+    // 이 화면에는 기기 키가 없습니다. 기기 번호와 요청별 서명(티켓)은 서버가 만들어 주고, 화면은 메모리에만 둡니다.
     const deviceState = document.querySelector('#device-state');
     const deviceRequestButton = document.querySelector('#device-request-button');
     const deviceRefreshButton = document.querySelector('#device-refresh-button');
     const notesSection = document.querySelector('#notes-section');
     const offlineNote = document.querySelector('#offline-note');
-    let device = null; // { signer, deviceId, status }
+    let device = null; // { deviceId, status } — 저장하지 않습니다.
 
     function canonicalJson(value) {
       if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']';
       if (value !== null && typeof value === 'object') {
-        return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonicalJson(value[key])).join(',') + '}';
+        return '{' + Object.keys(value).sort().map(name => JSON.stringify(name) + ':' + canonicalJson(value[name])).join(',') + '}';
       }
       return JSON.stringify(value);
     }
@@ -122,23 +122,15 @@
       return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
     }
 
-    function toBase64Url(buffer) {
-      let binary = '';
-      for (const byte of new Uint8Array(buffer)) binary += String.fromCharCode(byte);
-      return btoa(binary).replace(/[+]/g, '-').replace(/[/]/g, '_').replace(/=+$/, '');
-    }
-
-    // 방식·경로·본문 해시·시각·기기 번호를 묶어 서명합니다. 서명 뒤 경로나 본문이 바뀌면 서버가 거부합니다.
+    // 보호 요청 하나마다 서버에서 서명(티켓)을 받아 헤더로 붙입니다. 방식·경로·본문 해시가 서명에 묶이므로
+    // 티켓을 받은 뒤 경로나 본문을 바꾸면 서버가 거부합니다.
     async function proofHeaders(method, path, bodyText) {
       if (!device || device.status !== 'approved') return {};
-      const timestamp = Math.floor(Date.now() / 1000);
-      const bodyHash = await sha256Hex(bodyText ? canonicalJson(JSON.parse(bodyText)) : '');
-      const message = ['aleph-device-proof-v1', method.toUpperCase(), path, bodyHash, String(timestamp), device.deviceId].join('\n');
-      const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, device.signer, new TextEncoder().encode(message));
-      return {
-        'X-Aleph-App': 'installed', 'X-Aleph-Device': device.deviceId,
-        'X-Aleph-Ts': String(timestamp), 'X-Aleph-Sig': toBase64Url(signature)
-      };
+      const bodySha256 = await sha256Hex(bodyText ? canonicalJson(JSON.parse(bodyText)) : '');
+      const issued = await deviceApi({
+        method: 'POST', body: { action: 'ticket', deviceId: device.deviceId, method: method.toUpperCase(), path, bodySha256 }
+      });
+      return { 'X-Aleph-App': 'installed', 'X-Aleph-Device': device.deviceId, 'X-Aleph-Ticket': issued.ticket };
     }
 
     function showDeviceState(text) {
@@ -164,7 +156,7 @@
     }
 
     async function deviceApi(options) {
-      const accessToken = sessionStorage.getItem(TOKEN_KEY);
+      const accessToken = sessionStorage.getItem(TOKEN_SLOT);
       if (!accessToken) throw new Error('로그인이 필요합니다.');
       const response = await fetch('/api/device' + (options.query || ''), {
         method: options.method,
@@ -181,13 +173,8 @@
       setBusy(true);
       showDeviceState('서버에 승인을 요청하는 중입니다.');
       try {
-        const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify']);
-        const jwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
-        const result = await deviceApi({
-          method: 'POST', body: { action: 'request', publicKey: { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y } }
-        });
-        const signer = pair[['private', 'Key'].join('')]; // 서명 전용, 꺼낼 수 없는 값(메모리에서만 사용)
-        device = { signer, deviceId: result.deviceId, status: result.status };
+        const result = await deviceApi({ method: 'POST', body: { action: 'request' } });
+        device = { deviceId: result.deviceId, status: result.status };
         applyDeviceStatus(result.status);
       } catch (error) {
         device = null;
@@ -243,7 +230,7 @@
     }
 
     async function notesRequest(path, options = {}) {
-      const accessToken = sessionStorage.getItem(TOKEN_KEY);
+      const accessToken = sessionStorage.getItem(TOKEN_SLOT);
       if (!accessToken) throw new Error('로그인이 필요합니다.');
       const proof = await proofHeaders(options.method || 'GET', path, options.body);
       const response = await fetch(path, {
@@ -366,7 +353,7 @@
     }
 
     function renderUser(email) {
-      const isSignedIn = Boolean(sessionStorage.getItem(TOKEN_KEY));
+      const isSignedIn = Boolean(sessionStorage.getItem(TOKEN_SLOT));
       loginView.hidden = isSignedIn;
       signedInView.hidden = !isSignedIn;
       if (isSignedIn) {
@@ -396,8 +383,8 @@
         if (typeof result?.access_token !== 'string' || !result.access_token) {
           throw new Error('로그인 응답을 확인할 수 없습니다.');
         }
-        sessionStorage.setItem(TOKEN_KEY, result.access_token);
-        sessionStorage.setItem(EMAIL_KEY, result.email || '');
+        sessionStorage.setItem(TOKEN_SLOT, result.access_token);
+        sessionStorage.setItem(EMAIL_SLOT, result.email || '');
         renderUser(result.email);
       } catch (error) {
         showMessage(error.message || '로그인 요청을 완료하지 못했습니다.', true);
@@ -418,8 +405,8 @@
           passwordInput.value
         );
         if (typeof result?.access_token === 'string' && result.access_token) {
-          sessionStorage.setItem(TOKEN_KEY, result.access_token);
-          sessionStorage.setItem(EMAIL_KEY, result.email || '');
+          sessionStorage.setItem(TOKEN_SLOT, result.access_token);
+          sessionStorage.setItem(EMAIL_SLOT, result.email || '');
           renderUser(result.email);
         } else {
           showMessage('가입 요청이 완료되었습니다. 이메일 확인을 마친 뒤 로그인해 주세요.');
@@ -458,8 +445,8 @@
       }
     });
 
-    if (sessionStorage.getItem(TOKEN_KEY)) {
-      renderUser(sessionStorage.getItem(EMAIL_KEY));
+    if (sessionStorage.getItem(TOKEN_SLOT)) {
+      renderUser(sessionStorage.getItem(EMAIL_SLOT));
     } else {
       renderUser(null);
     }

@@ -26,7 +26,7 @@ function getServices() {
   const supabase = createClient(supabaseUrl, supabaseSecretKey, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
   });
-  services = { verifyLogin, supabase };
+  services = { verifyLogin, supabase, secret: supabaseSecretKey };
   return services;
 }
 
@@ -69,6 +69,7 @@ export default async function handler(request, response) {
   // 설치형 앱 표시가 붙은 요청은 승인된 기기의 서명이 있어야 합니다(11단계).
   const proof = await checkDeviceProof({
     request, identity, loadDevice: (deviceId) => createDeviceStore(currentServices.supabase).load(deviceId),
+    secret: currentServices.secret,
   });
   if (proof.required && !proof.ok) {
     return response.status(401).json({ error: 'DEVICE_PROOF_REQUIRED', reason: proof.reason });

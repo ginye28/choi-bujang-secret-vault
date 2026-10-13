@@ -1,12 +1,12 @@
-import { createHash, webcrypto } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 // 11단계: 설치형 앱의 기기 승인과 "서명된 요청" 확인.
-// - 앱은 기기 키쌍(ECDSA P-256)을 메모리에서만 만들고 공개키만 서버에 보냅니다. 비공개 키는 브라우저
-//   저장소(localStorage·sessionStorage·IndexedDB)에 넣지 않습니다.
-// - 서버가 공개키로 기기 번호를 계산하고, 로그인 사용자 소유의 "승인된" 기기일 때만 보호 요청을 받습니다.
-// - 요청 서명은 방식·경로·본문 해시·시각·기기 번호를 함께 묶어, 서명 뒤에 경로나 본문을 바꾸면 거부됩니다.
-// 승인 표시, 설치 표시, 브라우저가 보낸 사용자 번호는 기기 확인의 근거가 아닙니다.
-export const PROOF_VERSION = 'aleph-device-proof-v1';
+// - 브라우저(화면)에는 기기 키가 없습니다. 기기 번호는 서버가 발급하고, 요청 서명은 서버가 가진 비밀로
+//   요청 하나(방식·경로·본문 해시·시각·기기 번호·사용자)에 대해서만 발급하는 짧은 티켓입니다.
+// - 서버는 로그인 사용자 소유의 "승인된" 기기와 티켓이 맞을 때만 보호 요청을 받습니다. 티켓을 받은 뒤
+//   경로·방식·본문을 바꾸면 서명이 맞지 않아 거부됩니다.
+// 설치 표시, 승인 버튼 값, 브라우저가 보낸 사용자 번호는 기기 확인의 근거가 아닙니다.
+export const PROOF_VERSION = 'aleph-device-ticket-v1';
 export const APP_MARKER = 'installed';
 export const MAX_SKEW_SECONDS = 120;
 
@@ -35,24 +35,12 @@ export function bodyDigest(body) {
   return sha256Hex(canonicalJson(body));
 }
 
-export function publicJwk(jwk) {
-  if (!jwk || typeof jwk !== 'object' || jwk.kty !== 'EC' || jwk.crv !== 'P-256'
-      || typeof jwk.x !== 'string' || typeof jwk.y !== 'string'
-      || !B64URL.test(jwk.x) || !B64URL.test(jwk.y) || jwk.x.length > 64 || jwk.y.length > 64) return null;
-  return { crv: 'P-256', kty: 'EC', x: jwk.x, y: jwk.y };
-}
-
-export function deviceIdFromJwk(jwk) {
-  const clean = publicJwk(jwk);
-  return clean ? sha256Hex(canonicalJson(clean)).slice(0, 16) : null;
+export function newDeviceId() {
+  return randomBytes(8).toString('hex');
 }
 
 export function isDeviceId(value) {
   return typeof value === 'string' && DEVICE_ID.test(value);
-}
-
-export function signingString({ method, target, bodySha256, timestamp, deviceId }) {
-  return [PROOF_VERSION, String(method).toUpperCase(), target, bodySha256, String(timestamp), deviceId].join('\n');
 }
 
 // 서버가 실제로 받은 요청의 경로. 재작성된 주소(/api/notes?id=...)도 /api/notes/<id> 로 되돌려 같게 맞춥니다.
@@ -64,57 +52,67 @@ export function requestTarget(request) {
   return path;
 }
 
-function fromB64Url(text) {
-  return Buffer.from(text.replace(/-/gu, '+').replace(/_/gu, '/'), 'base64');
+export function signingString({ userId, deviceId, method, target, bodySha256, timestamp }) {
+  return [PROOF_VERSION, userId, deviceId, String(method).toUpperCase(), target, bodySha256, String(timestamp)].join('\n');
 }
 
-export async function verifySignature({ jwk, signature, message }) {
-  try {
-    const clean = publicJwk(jwk);
-    if (!clean || typeof signature !== 'string' || !B64URL.test(signature)) return false;
-    const key = await webcrypto.subtle.importKey('jwk', clean, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
-    return await webcrypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, fromB64Url(signature),
-      Buffer.from(message, 'utf8'));
-  } catch {
-    return false;
-  }
+function macOf(secret, message) {
+  const key = createHash('sha256').update(`${PROOF_VERSION}:${secret}`, 'utf8').digest();
+  return createHmac('sha256', key).update(message, 'utf8').digest('base64url');
+}
+
+// 요청 하나에 대한 티켓: "<시각>.<서명>" 형태입니다. 비밀은 서버에만 있습니다.
+export function issueTicket({ secret, userId, deviceId, method, target, bodySha256, now = Date.now() }) {
+  if (typeof secret !== 'string' || secret === '') throw new TypeError('ticket_secret_missing');
+  const timestamp = Math.floor(now / 1000);
+  const mac = macOf(secret, signingString({ userId, deviceId, method, target, bodySha256, timestamp }));
+  return { ticket: `${timestamp}.${mac}`, expiresInSeconds: MAX_SKEW_SECONDS };
+}
+
+function ticketMatches(secret, parts, ticket) {
+  const [timestamp, mac] = String(ticket).split('.');
+  if (!/^\d{9,12}$/u.test(timestamp ?? '') || !B64URL.test(mac ?? '')) return { ok: false, reason: 'SIGNATURE_INVALID' };
+  const expected = macOf(secret, signingString({ ...parts, timestamp: Number(timestamp) }));
+  const a = Buffer.from(mac);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return { ok: false, reason: 'SIGNATURE_INVALID' };
+  return { ok: true, timestamp: Number(timestamp) };
 }
 
 export function readProofHeaders(headers = {}) {
   const get = (name) => (typeof headers[name] === 'string' ? headers[name].trim() : '');
   return {
-    app: get('x-aleph-app'), deviceId: get('x-aleph-device'),
-    timestamp: get('x-aleph-ts'), signature: get('x-aleph-sig'),
+    app: get('x-aleph-app'), deviceId: get('x-aleph-device'), ticket: get('x-aleph-ticket'),
   };
 }
 
 /**
- * 설치형 앱 표시(x-aleph-app: installed)가 붙은 요청은 승인된 기기의 서명이 있어야 합니다.
- * 표시가 없는 요청은 이 확인의 대상이 아닙니다(기존 로그인 규칙 그대로).
- * loadDevice(deviceId) 는 서버 저장소의 기기 기록 { owner, jwk, status } 를 돌려줍니다.
+ * 보호 요청의 기기 서명 확인. 다음 중 하나이면 서명이 필요합니다.
+ *  - 설치형 앱 표시(x-aleph-app: installed)가 붙은 요청
+ *  - 학생 로그인(identity.kind === 'student') 요청: 설치 표시를 떼어 내도 서명 없이는 통과하지 못합니다.
+ * 심판이 발급한 시험 신원(kind: 'judge')은 기존 로그인·소유자 규칙을 그대로 따릅니다.
+ * loadDevice(deviceId) 는 서버 저장소의 기기 기록 { owner, status } 를 돌려줍니다.
  */
-export async function checkDeviceProof({ request, identity, loadDevice, now = Date.now() }) {
+export async function checkDeviceProof({ request, identity, loadDevice, secret, now = Date.now() }) {
   const proof = readProofHeaders(request.headers);
-  if (proof.app === '') return { required: false, ok: true };
+  const required = proof.app !== '' || identity?.kind === 'student';
+  if (!required) return { required: false, ok: true };
   const fail = (reason) => ({ required: true, ok: false, reason });
-  if (proof.app !== APP_MARKER) return fail('APP_MARKER_UNKNOWN');
-  if (!isDeviceId(proof.deviceId) || proof.timestamp === '' || proof.signature === '') {
-    return fail('SIGNATURE_MISSING');
-  }
-  const seconds = Number(proof.timestamp);
-  if (!Number.isInteger(seconds) || Math.abs(Math.floor(now / 1000) - seconds) > MAX_SKEW_SECONDS) {
-    return fail('SIGNATURE_EXPIRED');
-  }
+  if (proof.app !== '' && proof.app !== APP_MARKER) return fail('APP_MARKER_UNKNOWN');
+  if (!isDeviceId(proof.deviceId) || proof.ticket === '') return fail('SIGNATURE_MISSING');
+  if (typeof secret !== 'string' || secret === '') return fail('SERVER_NOT_CONFIGURED');
+
   const device = await loadDevice(proof.deviceId);
   if (!device || device.owner !== identity?.userId) return fail('DEVICE_UNKNOWN');
   if (device.status !== 'approved') return fail('DEVICE_NOT_APPROVED');
-  if (deviceIdFromJwk(device.jwk) !== proof.deviceId) return fail('DEVICE_RECORD_INVALID');
-  const message = signingString({
-    method: request.method, target: requestTarget(request), bodySha256: bodyDigest(request.body),
-    timestamp: seconds, deviceId: proof.deviceId,
-  });
-  const valid = await verifySignature({ jwk: device.jwk, signature: proof.signature, message });
-  return valid ? { required: true, ok: true, deviceId: proof.deviceId } : fail('SIGNATURE_INVALID');
+
+  const checked = ticketMatches(secret, {
+    userId: identity.userId, deviceId: proof.deviceId, method: request.method,
+    target: requestTarget(request), bodySha256: bodyDigest(request.body),
+  }, proof.ticket);
+  if (!checked.ok) return fail(checked.reason);
+  if (Math.abs(Math.floor(now / 1000) - checked.timestamp) > MAX_SKEW_SECONDS) return fail('SIGNATURE_EXPIRED');
+  return { required: true, ok: true, deviceId: proof.deviceId };
 }
 
 // 기기 기록 저장소: 제목이 비공개 접두사로 시작하는 training_notes 행을 씁니다(메모 API 에 나오지 않음).
@@ -132,7 +130,7 @@ export function createDeviceStore(supabase) {
       if (error || !data) return null;
       try {
         const record = JSON.parse(data.content);
-        if (record?.v !== 1 || record.deviceId !== deviceId || record.owner !== data.owner_id) return null;
+        if (record?.v !== 2 || record.deviceId !== deviceId || record.owner !== data.owner_id) return null;
         return record;
       } catch { return null; }
     },
@@ -150,16 +148,18 @@ export function createDeviceStore(supabase) {
         .select('content').eq('owner_id', owner).like('title', `${DEVICE_TITLE_PREFIX}%`);
       if (error || !Array.isArray(data)) throw error ?? new Error('device_lookup_failed');
       return data.map((row) => { try { return JSON.parse(row.content); } catch { return null; } })
-        .filter((record) => record?.v === 1 && record.owner === owner);
+        .filter((record) => record?.v === 2 && record.owner === owner);
     },
   };
 }
 
-// 새 기기 요청의 서버 결정: 최근 로그인(비밀번호 확인)이 있었거나 이 사용자의 첫 기기이면 승인,
+// 새 기기 요청의 서버 결정: 이 사용자의 첫 기기이거나, 로그인(비밀번호 확인)한 지 얼마 안 된 요청이면 승인,
 // 그 밖에는 승인 대기입니다. 브라우저의 "승인" 버튼 값은 쓰지 않습니다.
+export const RECENT_LOGIN_SECONDS = 3600;
+
 export function decideNewDevice({ approvedCount, loginAgeSeconds }) {
   if (approvedCount === 0) return { status: 'approved', reason: 'first_device' };
-  if (Number.isFinite(loginAgeSeconds) && loginAgeSeconds >= 0 && loginAgeSeconds <= 600) {
+  if (Number.isFinite(loginAgeSeconds) && loginAgeSeconds >= 0 && loginAgeSeconds <= RECENT_LOGIN_SECONDS) {
     return { status: 'approved', reason: 'recent_login' };
   }
   return { status: 'pending', reason: 'needs_approval' };
