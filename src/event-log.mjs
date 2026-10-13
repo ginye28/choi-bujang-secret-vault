@@ -146,7 +146,7 @@ export function summarizeEvents(events, viewerRef = null) {
   }
   // 막음: 기록에 거부 결과가 있고 같은 이름으로 허용된 기록은 없는 점검 이름만 셉니다.
   const blocked = [...blockedIds].filter((id) => !allowedIds.has(id)).length;
-  const allowed = allowedIds.size;
+  const allowed = [...allowedIds].filter((id) => !blockedIds.has(id)).length;
   const errors = [...errorIds].filter((id) => !blockedIds.has(id) && !allowedIds.has(id)).length;
   const notRun = Math.max(0, TOTAL_ATTACKS - blocked - allowed - errors);
   return {
@@ -194,9 +194,13 @@ export function withEventLog(handler) {
     if (!held.ended) return undefined;
     let supabase = null;
     try { supabase = await eventSupabase(); } catch { supabase = null; }
+    let logged = 'no-client';
     if (supabase !== null) {
-      await recordEvent(supabase, buildEvent({ request, status: held.status, body: held.body, requestId }));
+      const ok = await recordEvent(supabase, buildEvent({ request, status: held.status, body: held.body, requestId }));
+      logged = ok ? 'yes' : 'no';
     }
+    // 기록이 실제로 남았는지 응답 헤더로 알려 줍니다(값은 yes·no·no-client 뿐).
+    response.setHeader('X-Event-Logged', logged);
     realStatus(held.status);
     return realJson(held.body);
   };

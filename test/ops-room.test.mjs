@@ -58,50 +58,59 @@ test('가린 복구 요약은 메모 사본만 세고 본문·전체 ID·기기 
   assert.equal(text.includes('일반 메모'), false);
 });
 
-test('화면 요약 수치가 실행 기록 및 미실행 목록과 일치하고 서버 기록의 추가 데이터는 제외한다', async () => {
+test('실제 배포 API 기록과 코드 직접 호출 결과의 출처를 구별하며 나머지 서버 필드는 제외한다', async () => {
   const rows = await runLocalChecks();
-  const report = buildOpsReport({
-    rows,
-    deployedRows: [{
-      id: 'd1_check', stage: '2', scenario: '가상 점검', expected: 'HTTP 404', actual: 'HTTP 404',
-      requestId: 'local:check', checkedAt: '2026-10-13T01:00:00Z', status: STATUS_RAN_MATCHED,
-      content: '가상 메모 본문은 응답에 포함되면 안 됨',
-    }],
-    recovery: [{ title: '__backup__:note-identifier-123456:0123456789abcdef', created_at: '2026-10-13T01:00:00Z', content: '가상 본문 제외' }],
-    devices: [{ status: 'approved' }, { status: 'pending' }],
-  });
-  const verification = report.verification;
-  assert.equal(verification.executed, verification.rows.length);
-  assert.equal(verification.matched, verification.rows.filter((item) => item.status === STATUS_RAN_MATCHED).length);
-  assert.equal(verification.mismatched, verification.rows.length - verification.matched);
-  assert.equal(verification.notRun, verification.pending.length);
-  assert.equal(report.revocation.total, report.revocation.approved + report.revocation.pending + report.revocation.other);
-  assert.equal(report.recovery.versionCount, 1);
-  assert.equal(report.detection.sample.status, rows.find((item) => item.id === 's9_burst').status);
-  const serialized = JSON.stringify(report);
-  assert.equal(serialized.includes('가상 메모 본문'), false);
-  assert.equal(serialized.includes('가상 본문 제외'), false);
-  assert.equal(serialized.includes('note-identifier-123456'), false);
+  const deployed = [{
+    id: 'd12_probe', stage: '12', scenario: '가린 경로 확인', expected: 'HTTP 401', actual: 'HTTP 401',
+    requestId: 'vercel-request-1', checkedAt: '2026-10-13T01:00:00Z', status: STATUS_RAN_MATCHED,
+    serverBody: '가상 메모 본문', secretHeader: 'secret-token',
+  }];
+  const report = buildOpsReport({ rows, deployedRows: deployed, recovery: [], devices: [] });
+  const directRow = report.verification.rows.find((item) => item.id === rows[0].id);
+  const deployedRow = report.verification.rows.find((item) => item.id === 'd12_probe');
+  assert.equal(directRow.source, '코드 직접 호출');
+  assert.equal(deployedRow.source, '배포 API 응답');
+  assert.equal(report.verification.executed, rows.length + deployed.length);
+  assert.equal(report.verification.matched, report.verification.rows.filter((item) => item.status === STATUS_RAN_MATCHED).length);
+  assert.equal(report.verification.mismatched, report.verification.rows.length - report.verification.matched);
+  assert.equal(report.verification.notRun, report.verification.pending.length);
+  const json = JSON.stringify(report);
+  assert.equal(json.includes('가상 메모 본문'), false);
+  assert.equal(json.includes('secret-token'), false);
 });
 
-test('기기 상태 요약은 승인·대기·기타를 센다', () => {
+test('복구 수치는 메모 사본만 집계하고, 기기 상태 수치 합은 전체와 일치한다', () => {
+  const summary = summarizeRecovery([
+    { title: '__backup__:note-identifier-123456:0123456789abcdef', created_at: '2026-10-13T01:00:00Z', content: '가상 본문 제외' },
+    { title: '__backup__:device:abcdef0123456789', created_at: '2026-10-13T02:00:00Z', content: '기기 기록 제외' },
+  ]);
+  assert.equal(summary.versionCount, 1);
+  assert.equal(summary.noteCount, 1);
+  const json = JSON.stringify(summary);
+  assert.equal(json.includes('note-identifier-123456'), false);
+  assert.equal(json.includes('가상 본문 제외'), false);
+  assert.equal(json.includes('기기 기록 제외'), false);
   assert.deepEqual(
     summarizeDevices([{ status: 'approved' }, { status: 'pending' }, { status: 'x' }, null]),
     { approved: 1, pending: 1, other: 2, total: 4 },
   );
 });
 
-test('화면은 /api/ops 응답만 쓰고 브라우저 저장소를 쓰지 않는다', () => {
+test('화면은 보호된 /api/ops 응답을 textContent로 표시하고 가상 메모 본문 및 브라우저 저장소를 쓰지 않는다', () => {
   const page = read('public/index.html');
   assert.ok(page.includes('탈환 작전실'));
   assert.ok(page.includes("'/api/ops'"));
+  assert.ok(page.includes('events.recordedTotal'));
+  assert.ok(page.includes('assault.blocked'));
+  assert.ok(page.includes('item.route'));
+  assert.ok(page.includes('item.reason'));
   assert.equal(page.includes('localStorage'), false);
   assert.equal(page.includes('sessionStorage'), false);
   assert.equal(page.includes('indexedDB'), false);
   assert.equal(page.includes('innerHTML'), false);
   const api = read('api/ops.js');
   assert.ok(api.includes('checkDeviceProof'));
-  assert.equal(/\.select\([^)]*content/u.test(api), false, '작전실 API 는 메모 본문 열을 읽지 않는다');
+  assert.equal(/\.select\([^)]*content/u.test(api), false, '작전실 API는 복구용 content 열을 읽지 않는다');
 });
 
 test('설정에 12단계와 작전실 경로가 들어 있다', () => {

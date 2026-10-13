@@ -91,17 +91,49 @@ test('감싼 핸들러는 응답을 보내기 전에 기록을 남기고 요청 
   assert.deepEqual(sent, [['status', 401], ['json', { error: 'UNAUTHORIZED', reason: 'LOGIN_REQUIRED' }]]);
 });
 
-test('작전실 보고서에 서버 요청 기록 요약이 들어가고 화면이 그대로 보여 준다', async () => {
+test('작전실은 가린 서버 기록과 일치하는 요약만 제공하고 화면 수치는 그 응답을 렌더링한다', async () => {
   const rows = await runLocalChecks();
-  const events = { ...summarizeEvents([], null), available: true };
+  const secretId = 'secret-virtual-note-id';
+  const event = buildEvent({
+    request: {
+      method: 'GET', url: `/api/notes/${secretId}?private=query`, headers: { 'x-aleph-attack-id': 'anonymous_note_probe' },
+      body: { title: '가상 제목', body: '가상 메모 본문' },
+    },
+    status: 401, body: { error: 'UNAUTHORIZED', reason: 'LOGIN_REQUIRED' },
+    requestId: 'server-request-42', now: new Date('2026-10-13T00:00:00Z'),
+  });
+  const events = { ...summarizeEvents([event], null), available: true };
   const report = buildOpsReport({ rows, recovery: [], devices: [], events });
-  assert.equal(report.events.assault.total, 41);
-  assert.equal(report.events.assault.notRun, 41);
+  assert.equal(report.events.recordedTotal, 1);
+  assert.equal(report.events.recent.length, 1);
+  assert.equal(report.events.recent[0].route, '/api/notes/:id');
+  assert.equal(report.events.recent[0].requestId, 'server-request-42');
+  assert.equal(report.events.denyByRule.find((item) => item.rule === 'LOGIN_REQUIRED')?.count, 1);
+  assert.deepEqual(report.events.assault, { total: 41, blocked: 1, allowed: 0, errors: 0, notRun: 40 });
+  const json = JSON.stringify(report.events);
+  assert.equal(json.includes(secretId), false);
+  assert.equal(json.includes('private=query'), false);
+  assert.equal(json.includes('가상 메모 본문'), false);
   const page = read('public/index.html');
   for (const label of ['최근 사건 50줄', '규칙별 거부 수', '총공세 막음']) assert.ok(page.includes(label), label);
+  assert.ok(page.includes('events.recordedTotal'));
+  assert.ok(page.includes('assault.blocked'));
+  assert.ok(page.includes('item.route'));
+  assert.ok(page.includes('item.reason'));
+  assert.equal(page.includes('innerHTML'), false);
   for (const name of ['notes', 'announcements', 'restore', 'device', 'ops']) {
     assert.ok(read(`api/${name}.js`).includes('withEventLog(handler)'), name);
   }
+});
+
+test('작전실 기록을 읽지 못했을 때는 서버 기록 상태와 공격 미실행을 따로 표시한다', async () => {
+  const rows = await runLocalChecks();
+  const report = buildOpsReport({ rows, recovery: [], devices: [] });
+  assert.equal(report.events.available, false);
+  assert.equal(report.events.assault.notRun, TOTAL_ATTACKS);
+  assert.equal(report.events.assault.blocked, 0);
+  const page = read('public/index.html');
+  assert.ok(page.includes('서버 요청 기록을 읽지 못했습니다(미실행).'));
 });
 
 test('제출 묶음 점검은 읽기 요청만 보내고 점검 이름을 붙인다', () => {

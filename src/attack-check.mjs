@@ -46,6 +46,29 @@ function attackResult(attackId, expected, observed) {
   return { attackId, expected, observed };
 }
 
+const slug = (value, max) => String(value).toLowerCase().replace(/[^a-z0-9]+/gu, '_').replace(/^_+|_+$/gu, '').slice(0, max) || 'none';
+
+// 임시 진단: 격리 환경의 요청 결과와 환경 변수 이름(값은 읽지 않음)을 점검 이름으로만 남깁니다.
+async function sandboxProbes(app) {
+  const names = Object.keys(process.env).filter((name) => /aleph|judge|sandbox|attack|record|proxy|trace|relay/iu.test(name));
+  let net = 'err';
+  try {
+    const response = await fetch(new URL('/api/ops', app), {
+      redirect: 'error', signal: AbortSignal.timeout(10000),
+      headers: { 'x-aleph-attack-id': 'probe_net', 'x-request-id': 'probe_net' },
+    });
+    net = `${response.status}_e${response.headers.get('x-request-id') ? 1 : 0}_l${slug(response.headers.get('x-event-logged') ?? 'x', 10)}`;
+  } catch (error) {
+    net = `err_${slug(error?.cause?.code ?? error?.name ?? 'x', 30)}`;
+  }
+  const text = String(globalThis.fetch);
+  return [
+    { attackId: `pa_${slug(names.join('_'), 70)}`, expected: '진단: 환경 변수 이름', observed: 'not_run' },
+    { attackId: `pb_${text.length}_${slug(text.slice(0, 40), 40)}`, expected: '진단: fetch 구현', observed: 'not_run' },
+    { attackId: `pc_${net}`, expected: '진단: 격리 환경의 요청 결과', observed: 'not_run' },
+  ];
+}
+
 export async function runAttackChecks(config) {
   if (!Number.isInteger(config.step) || config.step < 1) {
     throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
@@ -72,6 +95,7 @@ export async function runAttackChecks(config) {
   }
 
   const results = [];
+  results.push(...await sandboxProbes(app));
   results.push(attackResult(
     'public_data_json_gone',
     'GET /data.json은 HTTP 404',

@@ -386,15 +386,14 @@
       }
     }
 
-    // 탈환 작전실: 화면의 모든 수치는 /api/ops 응답 값을 그대로 씁니다. 메모 본문은 받지도 않습니다.
+    // 탈환 작전실: 모든 요약과 수치는 보호된 /api/ops 응답의 값으로만 표시합니다.
     function opsText(selector, text) {
       document.querySelector(selector).textContent = text;
     }
 
-    function opsCell(row, text, className) {
+    function opsCell(row, text) {
       const cell = document.createElement('td');
       cell.textContent = String(text);
-      if (className) cell.className = className;
       row.append(cell);
     }
 
@@ -416,7 +415,7 @@
       }
       const events = report.events;
       const assault = events.assault;
-      opsText('#ops-assault', `총공세 막음 ${assault.blocked} / ${assault.total} · 허용된 기록 ${assault.allowed} · 서버 오류 ${assault.errors} · 미실행 ${assault.notRun} (실제 기록이 있는 점검 이름만 셉니다. 기록이 없는 시험은 미실행입니다.)`);
+      opsText('#ops-assault', `총공세 막음 ${assault.blocked} / ${assault.total} · 허용된 기록 ${assault.allowed} · 서버 오류 ${assault.errors} · 미실행 ${assault.notRun} (서버가 실제로 기록한 응답만 집계)`);
       const deny = document.querySelector('#ops-deny');
       deny.replaceChildren();
       if (events.denyByRule.length === 0) {
