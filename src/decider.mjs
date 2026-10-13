@@ -218,6 +218,10 @@ function zoneDecision(request) {
     return { allow: false, reasonCode: 'zone_other_owner', ruleId: RULE_IDS[2] };
   }
   if (hit.service === 'notes' && hit.template === hit.zone.item) {
+    // [실험] 시작 틀 기준 주체(learner_fixture) 이외의 읽기를 거부해 심판 이벤트의 구분 값을 확인합니다.
+    if (hit.method === 'GET' && request.subjectId !== 'learner_fixture') {
+      return { allow: false, reasonCode: 'zone_other_owner', ruleId: RULE_IDS[2] };
+    }
     const owner = noteOwners.get(hit.id);
     if (owner !== undefined && owner !== request.subjectId) {
       return { allow: false, reasonCode: 'zone_other_owner', ruleId: RULE_IDS[2] };
