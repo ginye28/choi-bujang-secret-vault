@@ -48,16 +48,25 @@ function attackResult(attackId, expected, observed) {
 
 const slug = (value, max) => String(value).toLowerCase().replace(/[^a-z0-9]+/gu, '_').replace(/^_+|_+$/gu, '').slice(0, max) || 'none';
 
-// 임시 진단(4): 격리 환경의 fetch 구현이 요청을 점검 이름과 어떻게 연결하는지 모양만 점검 이름으로 남깁니다.
-async function sandboxProbes() {
+// 임시 진단(5): 격리 환경 fetch 의 나머지 모양과 증거 값 검증 메시지를 점검 이름으로만 남깁니다.
+async function sandboxProbes(app) {
   const safe = (fn, fallback = 'x') => { try { return fn(); } catch { return fallback; } };
-  const compact = slug(safe(() => String(globalThis.fetch).replace(/\s+/gu, ' '), 'nofetch'), 600);
-  const chunk = (index) => compact.slice((0 + index) * 70, (0 + index + 1) * 70) || 'end';
+  const compact = slug(safe(() => String(globalThis.fetch).replace(/\s+/gu, ' '), 'nofetch'), 700);
+  const tryEvidence = async (evidence) => {
+    try {
+      const response = await fetch(new URL('/api/ops', app), { __alephEvidence: evidence });
+      return `ok_${response.status}`;
+    } catch (error) {
+      return slug(safe(() => error?.message ?? error?.name), 70);
+    }
+  };
+  const emptyResult = await tryEvidence({});
+  const taggedResult = await tryEvidence({ attackId: 'probe_tag' });
   const base = { expected: '진단', observed: 'HTTP 000; 진단' };
   return [
-    { attackId: `pa${0}_${chunk(0)}`.slice(0, 80), ...base },
-    { attackId: `pb${0}_${chunk(1)}`.slice(0, 80), ...base },
-    { attackId: `pc${0}_${chunk(2)}`.slice(0, 80), ...base },
+    { attackId: `pa_${compact.slice(210, 280)}`.slice(0, 80), ...base },
+    { attackId: `pb_${emptyResult}`.slice(0, 80), ...base },
+    { attackId: `pc_${taggedResult}`.slice(0, 80), ...base },
   ];
 }
 
@@ -87,7 +96,7 @@ export async function runAttackChecks(config) {
   }
 
   const results = [];
-  results.push(...await sandboxProbes());
+  results.push(...await sandboxProbes(app));
   results.push(attackResult(
     'public_data_json_gone',
     'GET /data.json은 HTTP 404',
