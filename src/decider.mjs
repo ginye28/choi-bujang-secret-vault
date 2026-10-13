@@ -111,35 +111,85 @@ const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 const RESOURCE_ID_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/u;
 const FUNCTION_WORDS = new Set(['export', 'import', 'all', 'list', 'search', 'admin', 'bulk',
   'download', 'upload', 'new', 'count', 'stats', 'sync', 'backup', 'restore']);
+const OWNER_MARKER_PATTERN = /(?:^|[^A-Za-z0-9])((?:learner|subject|sub|user|student)_)/iu;
+const OWNER_MARKER_SCAN = /(?:^|[^A-Za-z0-9])((?:learner|subject|sub|user|student)_)/giu;
+const SUBJECT_OWNER_PREFIX = /^(?:learner|subject|sub|user|student)_[A-Za-z0-9]/iu;
+const ANNOUNCEMENT_MARKERS = ['announcement', 'notice', 'instructor', '공지'];
+
+// 경로 모양이 item route일 때 ID를 꺼냅니다. ID 문자 검증 전에도 공지 쓰기를
+// 거부해야 하므로, 이 함수 자체에서는 ID의 문자 집합을 제한하지 않습니다.
+function pathResourceId(request) {
+  const zone = ZONES[request.service];
+  if (!zone || request.route !== `${request.method} ${zone.item}`) return null;
+  const prefix = `${zone.collection}/`;
+  if (!request.path.startsWith(prefix)) return null;
+  const id = request.path.slice(prefix.length);
+  return id && !id.includes('/') ? id : null;
+}
+
+function hasOwnerMarker(id) {
+  return OWNER_MARKER_PATTERN.test(id);
+}
+
+function ownerMarkerMatchesSubject(id, subjectId) {
+  if (!SUBJECT_OWNER_PREFIX.test(subjectId)) return false;
+  let foundMarker = false;
+  for (const match of id.matchAll(OWNER_MARKER_SCAN)) {
+    foundMarker = true;
+    const markerPrefix = match[1];
+    const markerStart = match.index + match[0].length - markerPrefix.length;
+    const afterSubject = markerStart + subjectId.length;
+    if (!id.startsWith(subjectId, markerStart)
+        || (afterSubject < id.length && /[A-Za-z0-9]/u.test(id[afterSubject]))) return false;
+  }
+  return foundMarker;
+}
+
+function containsAnnouncementMarker(id) {
+  const normalizedId = id.toLowerCase();
+  return ANNOUNCEMENT_MARKERS.some((marker) => normalizedId.includes(marker));
+}
 
 function matchZone(request) {
   const zone = ZONES[request.service];
   if (!zone) return null;
   const { method, path, route } = request;
   let template = null;
+  let id = null;
   if (path === zone.collection) {
     template = zone.collection;
   } else if (path.startsWith(`${zone.collection}/`)) {
-    const id = path.slice(zone.collection.length + 1);
+    id = path.slice(zone.collection.length + 1);
     if (!RESOURCE_ID_SEGMENT.test(id) || FUNCTION_WORDS.has(id.toLowerCase())) return null;
     template = zone.item;
   }
   if (template === null || route !== `${method} ${template}`) return null;
-  return { service: request.service, template, method, zone };
+  return { service: request.service, template, method, id, zone };
 }
 
 // 반환: { allow: true } | { allow: false, reasonCode, ruleId }
 function zoneDecision(request) {
+  const rawId = pathResourceId(request);
+  if (WRITE_METHODS.includes(request.method) && rawId !== null
+      && containsAnnouncementMarker(rawId)) {
+    return { allow: false, reasonCode: 'announcement_write_denied', ruleId: RULE_IDS[3] };
+  }
+
   const hit = matchZone(request);
   if (!hit) return { allow: false, reasonCode: 'route_not_allowed', ruleId: RULE_IDS[2] };
   if (hit.service === 'announcements' && WRITE_METHODS.includes(hit.method)) {
     // 판정 계약에는 검증된 강사 역할이 없으므로 일반 학생은 공지를 수정할 수 없습니다.
     return { allow: false, reasonCode: 'announcement_write_denied', ruleId: RULE_IDS[3] };
   }
-  if (hit.zone.methods[hit.template].includes(hit.method)) {
-    return { allow: true, ruleId: hit.service === 'notes' ? RULE_IDS[2] : RULE_IDS[3] };
+  if (!hit.zone.methods[hit.template].includes(hit.method)) {
+    return { allow: false, reasonCode: 'route_not_allowed', ruleId: RULE_IDS[2] };
   }
-  return { allow: false, reasonCode: 'route_not_allowed', ruleId: RULE_IDS[2] };
+  if (hit.service === 'notes' && hit.template === hit.zone.item
+      && hasOwnerMarker(hit.id)
+      && !ownerMarkerMatchesSubject(hit.id, request.subjectId)) {
+    return { allow: false, reasonCode: 'zone_other_owner', ruleId: RULE_IDS[2] };
+  }
+  return { allow: true, ruleId: hit.service === 'notes' ? RULE_IDS[2] : RULE_IDS[3] };
 }
 
 function needsStepUp(request) {

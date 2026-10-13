@@ -38,6 +38,17 @@ test('자기 메모 읽기·수정은 허용된다', async () => {
   }
 });
 
+test('ID에 소유자 표지가 있으면 subjectId와 일치하는 메모만 허용한다', async () => {
+  const own = await outcome(request('GET', '/notes/memo_learner_fixture_note', 'GET /notes/:id'));
+  assert.deepEqual([own.decision, own.reasonCode], ['allow', 'approved']);
+
+  const other = await outcome(request('GET', '/notes/memo_learner_other_note', 'GET /notes/:id'));
+  assert.deepEqual([other.decision, other.reasonCode], ['deny', 'zone_other_owner']);
+
+  const unmarked = await outcome(request('GET', '/notes/memo_without_owner_marker', 'GET /notes/:id'));
+  assert.deepEqual([unmarked.decision, unmarked.reasonCode], ['allow', 'approved']);
+});
+
 test('공지는 읽을 수 있고 일반 학생의 공지 수정은 거부된다', async () => {
   const read = await outcome(request('GET', '/announcements/announcement_1', 'GET /announcements/:id'));
   assert.equal(read.decision, 'allow');
@@ -46,6 +57,7 @@ test('공지는 읽을 수 있고 일반 학생의 공지 수정은 거부된다
     ['PATCH', '/announcements/announcement_1', 'PATCH /announcements/:id'],
     ['DELETE', '/announcements/announcement_1', 'DELETE /announcements/:id'],
     ['POST', '/announcements', 'POST /announcements'],
+    ['PUT', '/notes/announcement_1', 'PUT /notes/:id'],
   ]) {
     const out = await outcome(request(method, path, route));
     assert.deepEqual([out.decision, out.reasonCode], ['deny', 'announcement_write_denied'], route);
