@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
-import { decide, RULE_IDS } from '../src/decider.mjs';
+import { decide, resetNoteOwners, RULE_IDS } from '../src/decider.mjs';
 
 const NOTE_ID = '0b2f9d3e-6a14-4a39-8f0e-3d1c7a9b5e21';
 
@@ -24,6 +24,7 @@ const outcome = async (r) => {
 };
 
 test('자기 메모 읽기·수정은 허용된다', async () => {
+  resetNoteOwners();
   for (const [method, path, route] of [
     ['GET', `/notes/${NOTE_ID}`, 'GET /notes/:id'],
     ['PUT', `/notes/${NOTE_ID}`, 'PUT /notes/:id'],
@@ -33,6 +34,32 @@ test('자기 메모 읽기·수정은 허용된다', async () => {
     assert.equal(out.decision, 'allow', `${route} ${path}`);
     assert.ok(out.ruleIds.every((id) => RULE_IDS.includes(id)));
   }
+});
+
+test('먼저 읽은 주체가 메모 소유자가 되고 다른 주체의 읽기·수정은 거부된다', async () => {
+  resetNoteOwners();
+  const id = randomUUID();
+  const path = `/notes/${id}`;
+  const as = (subjectId) => ({ subjectId });
+
+  // 소유자를 아직 모르는 자료의 수정은 열지 않는다.
+  const blindPut = await outcome(request('PUT', path, 'PUT /notes/:id', as('learner_a')));
+  assert.deepEqual([blindPut.decision, blindPut.reasonCode], ['deny', 'route_not_allowed']);
+
+  const ownRead = await outcome(request('GET', path, 'GET /notes/:id', as('learner_a')));
+  assert.deepEqual([ownRead.decision, ownRead.reasonCode], ['allow', 'approved']);
+  const ownWrite = await outcome(request('PUT', path, 'PUT /notes/:id', as('learner_a')));
+  assert.deepEqual([ownWrite.decision, ownWrite.reasonCode], ['allow', 'approved']);
+
+  for (const method of ['GET', 'PUT']) {
+    const other = await outcome(request(method, path, `${method} /notes/:id`, as('learner_b')));
+    assert.deepEqual([other.decision, other.reasonCode], ['deny', 'zone_other_owner'], method);
+    assert.ok(other.ruleIds.every((rule) => RULE_IDS.includes(rule)));
+  }
+
+  // 다른 주체의 거부가 소유자를 바꾸지 않는다.
+  const again = await outcome(request('GET', path, 'GET /notes/:id', as('learner_a')));
+  assert.equal(again.decision, 'allow');
 });
 
 test('목록·생성·삭제는 구역 규칙이 열지 않고, 쿼리가 붙은 자료 경로도 거부한다', async () => {

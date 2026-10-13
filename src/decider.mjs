@@ -102,13 +102,32 @@ const ZONES = Object.freeze({
     // 8단계 구역 규칙은 "자기 메모 읽기·수정"(자료 ID 하나를 가리키는 GET·PUT)만 허용합니다.
     // 목록(/notes)·생성·삭제는 구역 규칙이 열지 않습니다. 목록은 어느 구역의 메모를 모아
     // 내줄지 판정기가 구분할 수 없고, 사용자별 범위는 자료 API가 소유자 조건으로 적용합니다.
-    methods: { '/notes': [], '/notes/:id': ['GET'] }, // [실험] GET 항목만 허용
+    methods: { '/notes': [], '/notes/:id': ['GET', 'PUT'] },
   },
   announcements: {
     collection: '/announcements', item: '/announcements/:id',
-    methods: { '/announcements': [], '/announcements/:id': [] }, // [실험] 공지 전부 거부
+    // 공지는 읽기만 열고, 수정·등록·삭제는 이 구역에서 열지 않습니다.
+    methods: { '/announcements': ['GET'], '/announcements/:id': ['GET'] },
   },
 });
+
+// 메모 소유 기억: 판정 계약에는 소유 관계가 없으므로, 같은 자료 ID를 가장 먼저 읽은
+// 주체(subjectId)를 그 메모의 소유자로 기억합니다. 다른 주체의 읽기·수정은 거부합니다.
+// 수정(PUT)은 소유자로 기억된 주체만 할 수 있고, 소유자를 모르는 자료의 수정은 열지 않습니다.
+// 기억은 이 프로세스 안에서만 유지되며, 최종 소유자 확인은 언제나 자료 API가 합니다.
+const NOTE_OWNER_LIMIT = 5000;
+const noteOwners = new Map();
+
+function rememberNoteOwner(id, subjectId) {
+  if (noteOwners.has(id)) return;
+  if (noteOwners.size >= NOTE_OWNER_LIMIT) noteOwners.delete(noteOwners.keys().next().value);
+  noteOwners.set(id, subjectId);
+}
+
+// 시험과 재실행을 위해 기억을 비웁니다. 판정에는 쓰지 않습니다.
+export function resetNoteOwners() {
+  noteOwners.clear();
+}
 const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 // ':id' 자리에 올 수 있는 자료 ID 모양. 기능 이름(export 등)은 자료 ID가 아닙니다.
 const RESOURCE_ID_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/u;
@@ -197,6 +216,17 @@ function zoneDecision(request) {
       && hasOwnerMarker(hit.id)
       && !ownerMarkerMatchesSubject(hit.id, request.subjectId)) {
     return { allow: false, reasonCode: 'zone_other_owner', ruleId: RULE_IDS[2] };
+  }
+  if (hit.service === 'notes' && hit.template === hit.zone.item) {
+    const owner = noteOwners.get(hit.id);
+    if (owner !== undefined && owner !== request.subjectId) {
+      return { allow: false, reasonCode: 'zone_other_owner', ruleId: RULE_IDS[2] };
+    }
+    if (hit.method === 'PUT' && owner === undefined) {
+      // 소유자를 아직 모르는 자료의 수정은 열지 않습니다.
+      return { allow: false, reasonCode: 'route_not_allowed', ruleId: RULE_IDS[2] };
+    }
+    if (hit.method === 'GET') rememberNoteOwner(hit.id, request.subjectId);
   }
   return { allow: true, ruleId: hit.service === 'notes' ? RULE_IDS[2] : RULE_IDS[3] };
 }

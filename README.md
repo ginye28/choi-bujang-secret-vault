@@ -5,7 +5,7 @@
 - **자원 ID**: 메모는 기존 UUID, 강사 공지는 `announcement_<UUID>`로 구분합니다. 메모 API는 공지 ID를, 공지 API는 메모 ID를 `400 INVALID_ID`로 거부합니다.
 - **판정기 구역 규칙** (`src/decider.mjs`): 엔진이 확인한 `service`·`method`·`route`·`path`로만 구역을 고르고 쿼리 값은 기능을 고르는 데 쓰지 않습니다.
   - `GET·PUT /notes/:id` → 허용(규칙 `zone_own_notes`). 구역 규칙은 자기 메모 하나를 가리키는 읽기·수정만 엽니다. 목록(`GET /notes`)·생성(`POST /notes`)·삭제는 열지 않고 `route_not_allowed`로 거부합니다. 사용자별 목록 범위는 자료 API가 소유자 조건으로 적용합니다.
-  - 메모의 소유자는 판정 계약에 소유 관계가 없어서 자료 ID의 소유자 표지(`learner_`·`subject_`·`sub_`·`user_`·`student_`로 시작)가 `subjectId`와 다르면 거부(`zone_other_owner`)하고, 표지가 없는 ID는 허용합니다. 최종 소유자 확인은 자료 API가 합니다.
+  - 메모의 소유자는 판정 계약에 소유 관계가 없어서 두 가지로 가립니다. ① 자료 ID의 소유자 표지(`learner_`·`subject_`·`sub_`·`user_`·`student_`로 시작)가 `subjectId`와 다르면 거부(`zone_other_owner`)합니다. ② 같은 자료 ID를 가장 먼저 읽은 `subjectId`를 소유자로 기억하고, 다른 `subjectId`의 읽기·수정은 거부(`zone_other_owner`)합니다. 소유자를 모르는 자료의 `PUT`은 열지 않습니다. 기억은 판정기 프로세스 안에서만 유지되고, 최종 소유자 확인은 자료 API가 합니다.
   - 자료 경로에 쿼리가 붙은 요청(`queryLength > 0`)은 거부(`query_not_allowed`)합니다. 쿼리로 기능이나 자료를 고르지 않습니다.
   - `GET /announcements`, `GET /announcements/:id` → 허용(규칙 `zone_announcements`).
   - 공지에 대한 `PUT·POST·PATCH·DELETE` → 거부(`announcement_write_denied`). 판정 계약에는 검증된 강사 역할이 없어서 일반 학생은 공지를 수정할 수 없습니다.
