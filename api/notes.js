@@ -165,7 +165,6 @@ export default async function handler(request, response) {
         .maybeSingle();
       if (error) return response.status(500).json({ error: 'NOTES_SERVICE_UNAVAILABLE' });
       if (!data) return notFound(response);
-      await saveBackupSafely(supabase, { id: data.id, owner: identity.userId, title: body.title, content: body.body });
       return response.status(200).json({ id: data.id });
     }
 

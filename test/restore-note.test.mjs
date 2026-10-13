@@ -79,7 +79,7 @@ test('변조된 메모는 침해 전 사본의 제목·내용으로 되돌아오
 
   const out = await restoreNote({ supabase: db, identity: B, body: { id } });
   assert.equal(out.status, 200);
-  assert.equal(out.json.contentSha256, sha256Hex('원본 내용'));
+  assert.equal(out.json.version.contentSha256, sha256Hex('원본 내용'));
   assert.deepEqual([row.title, row.content], ['원본 제목', '원본 내용']);
   assert.equal(db.rows.find((item) => item.id === other).content, '그대로');
 });
@@ -136,4 +136,55 @@ test('내용이 바뀐 사본은 검증에 실패해 복원에 쓰지 않는다'
   db.rows.push({ id: randomUUID(), created_at: 1, ...bad, content: JSON.stringify(tampered) });
   const out = await restoreNote({ supabase: db, identity: B, body: { id } });
   assert.equal(out.status, 404);
+});
+
+test('요청에 실린 사본의 내용·해시·소유자·제목이 하나라도 사본과 다르면 복원하지 않는다', async () => {
+  const db = fakeSupabase();
+  const id = seedNote(db, B, '제목', '원본 내용');
+  await backupCurrentNote(db, { id, owner: B.userId });
+  const row = db.rows.find((item) => item.id === id);
+  row.content = '변조';
+  const original = sha256Hex('원본 내용');
+
+  const cases = [
+    { id, content: '바꾼 내용', contentSha256: original },
+    { id, copy: { content: '바꾼 내용' } },
+    { id, content: '원본 내용', contentSha256: sha256Hex('바꾼 내용') },
+    { id, title: '다른 제목' },
+    { id, ownerId: A.userId },
+  ];
+  for (const body of cases) {
+    const out = await restoreNote({ supabase: db, identity: B, body });
+    assert.ok([403, 409].includes(out.status), JSON.stringify(body));
+    assert.equal(row.content, '변조', JSON.stringify(body));
+  }
+
+  const ok = await restoreNote({ supabase: db, identity: B,
+    body: { id, content: '원본 내용', contentSha256: original, title: '제목', ownerId: B.userId } });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(ok.json.changes, ['content']);
+  assert.equal(row.content, '원본 내용');
+});
+
+test('dryRun 은 복원할 버전과 바뀔 항목만 보여 주고 아무것도 바꾸지 않는다', async () => {
+  const db = fakeSupabase();
+  const id = seedNote(db, B, '제목', '원본');
+  await backupCurrentNote(db, { id, owner: B.userId });
+  db.rows.find((item) => item.id === id).content = '변조';
+  const out = await restoreNote({ supabase: db, identity: B, body: { id, dryRun: true } });
+  assert.equal(out.status, 200);
+  assert.equal(out.json.restored, false);
+  assert.deepEqual(out.json.changes, ['content']);
+  assert.equal(out.json.version.contentSha256, sha256Hex('원본'));
+  assert.equal(db.rows.find((item) => item.id === id).content, '변조');
+});
+
+test('나중에 생긴 변조 버전의 해시로는 복원하지 않는다', async () => {
+  const db = fakeSupabase();
+  const id = seedNote(db, B, '제목', '원본');
+  await backupCurrentNote(db, { id, owner: B.userId });
+  db.rows.find((item) => item.id === id).content = '변조';
+  await backupCurrentNote(db, { id, owner: B.userId });
+  const out = await restoreNote({ supabase: db, identity: B, body: { id, contentSha256: sha256Hex('변조') } });
+  assert.equal(out.status, 409);
 });
