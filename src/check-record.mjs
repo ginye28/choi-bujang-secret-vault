@@ -23,7 +23,8 @@ export function loadCheckRecord({
   try {
     const bundle = JSON.parse(readFileSync(bundleUrl, 'utf8'));
     if (bundle?.schema === 'aleph.defense.submission.v2' && Array.isArray(bundle.attackAttempts)) {
-      return { ...buildCheckRecord(bundle.attackAttempts, { checkedAt: null }), source: 'artifacts/submission.json' };
+      const checkedAt = typeof bundle.checkedAt === 'string' && !Number.isNaN(Date.parse(bundle.checkedAt)) ? new Date(bundle.checkedAt) : null;
+      return { ...buildCheckRecord(bundle.attackAttempts, { checkedAt }), source: 'artifacts/submission.json' };
     }
   } catch {
     // 제출 묶음이 없으면 커밋된 기록을 봅니다.
@@ -40,7 +41,9 @@ export function buildCheckRecord(attempts, { checkedAt = new Date() } = {}) {
     schema: CHECK_RECORD_SCHEMA,
     checkedAt: checkedAt ? checkedAt.toISOString() : null,
     note: 'npm run checks:record 로 실제 배포에 보낸 읽기 요청의 관측 값입니다. 심판의 41종 시험 결과가 아닙니다.',
-    attempts: attempts.map(({ attackId, expected, observed }) => ({ attackId, expected, observed })),
+    attempts: attempts.map(({ attackId, stage, expected, observed }) => ({
+      attackId, stage, expected, observed, result: classifyAttempt({ attackId, observed }),
+    })),
   };
 }
 
@@ -51,6 +54,7 @@ export function summarizeCheckRecord(record) {
     .slice(0, 20)
     .map((item) => ({
       attackId: item.attackId,
+      stage: Number.isInteger(item.stage) ? item.stage : null,
       expected: text(item.expected, 300),
       observed: text(item.observed, 300),
       result: classifyAttempt(item),

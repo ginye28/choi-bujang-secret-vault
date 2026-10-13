@@ -1,47 +1,63 @@
 {
   "schema": "aleph.check.record.v1",
-  "checkedAt": "2026-10-13T07:40:18.620Z",
+  "checkedAt": "2026-10-13T07:48:03.397Z",
   "note": "npm run checks:record 로 실제 배포에 보낸 읽기 요청의 관측 값입니다. 심판의 41종 시험 결과가 아닙니다.",
   "attempts": [
     {
       "attackId": "public_data_json_gone",
+      "stage": 2,
       "expected": "GET /data.json은 HTTP 404",
-      "observed": "HTTP 404; method=GET"
+      "observed": "HTTP 404; method=GET",
+      "result": "blocked"
     },
     {
       "attackId": "anonymous_notes_list_rejected",
+      "stage": 3,
       "expected": "인증 헤더 없는 GET /api/notes는 HTTP 401",
-      "observed": "HTTP 401; method=GET"
+      "observed": "HTTP 401; method=GET",
+      "result": "blocked"
     },
     {
       "attackId": "anonymous_note_item_rejected",
+      "stage": 4,
       "expected": "인증 헤더 없이 다른 사람 메모 GET /api/notes/<자료 ID>는 HTTP 401",
-      "observed": "HTTP 401; method=GET"
+      "observed": "HTTP 401; method=GET",
+      "result": "blocked"
     },
     {
       "attackId": "fake_token_rejected",
+      "stage": 3,
       "expected": "가짜 Bearer 토큰을 보낸 GET /api/notes는 HTTP 401",
-      "observed": "HTTP 401; method=GET"
+      "observed": "HTTP 401; method=GET",
+      "result": "blocked"
     },
     {
       "attackId": "anonymous_restore_route_rejected",
+      "stage": 10,
       "expected": "인증 헤더 없는 GET /api/restore는 HTTP 401",
-      "observed": "HTTP 401; method=GET"
+      "observed": "HTTP 401; method=GET",
+      "result": "blocked"
     },
     {
       "attackId": "anonymous_ops_room_rejected",
+      "stage": 12,
       "expected": "인증 헤더 없는 GET /api/ops는 HTTP 401",
-      "observed": "HTTP 401; method=GET"
+      "observed": "HTTP 401; method=GET",
+      "result": "blocked"
     },
     {
       "attackId": "installed_marker_without_login_rejected",
+      "stage": 11,
       "expected": "설치 표시만 붙인 로그인 없는 GET /api/notes는 HTTP 401",
-      "observed": "HTTP 401; method=GET"
+      "observed": "HTTP 401; method=GET",
+      "result": "blocked"
     },
     {
       "attackId": "original_table_path_not_exposed",
+      "stage": 5,
       "expected": "배포 주소에서 원본 표 경로 GET /rest/v1/training_notes는 HTTP 404",
-      "observed": "HTTP 404; method=GET"
+      "observed": "HTTP 404; method=GET",
+      "result": "blocked"
     }
   ]
 }

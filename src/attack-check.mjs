@@ -65,8 +65,10 @@ async function requestObservation(url, options = {}, attackId) {
   }
 }
 
-function attackResult(attackId, expected, observed) {
-  return { attackId, expected, observed };
+// 점검 결과 한 건: 점검 이름·단계·기대·관측 값과, 관측한 HTTP 상태로만 정한 결과(blocked·breached·not_run).
+// 요청을 보내지 못한 점검은 observed·result 모두 not_run 이고 「막음」으로 세지 않습니다.
+function attackResult(attackId, stage, expected, observed) {
+  return { attackId, stage, expected, observed, result: classifyAttempt({ attackId, observed }) };
 }
 
 // 실행기가 배포 주소 문자열만 넘겨도 같은 점검을 하도록, 나머지 설정은 aleph.config.json 에서 읽습니다.
@@ -103,29 +105,30 @@ export async function runAttackChecks(input) {
         // A non-JSON response is a failed check, not a successful deployment.
       }
     }
-    return [{ attackId: 'anonymous_note_read', expected: '비로그인 화면에서 가상 메모를 확인',
-      observed: visible ? '비로그인 요청에서 공개 가상 메모 확인 표시가 보임' : `비로그인 요청에서 확인 표시가 보이지 않음 (HTTP ${response.status})` }];
+    return [{ attackId: 'anonymous_note_read', stage: 1, expected: '비로그인 화면에서 가상 메모를 확인',
+      observed: visible ? '비로그인 요청에서 공개 가상 메모 확인 표시가 보임' : `비로그인 요청에서 확인 표시가 보이지 않음 (HTTP ${response.status})`,
+      result: visible ? 'breached' : 'blocked' }];
   }
 
   const results = [];
   results.push(attackResult(
-    'public_data_json_gone',
+    'public_data_json_gone', 2,
     'GET /data.json은 HTTP 404',
     await requestObservation(new URL('/data.json', app), {}, 'public_data_json_gone'),
   ));
   // 1첩반상: 같은 제출본 안에서 무인증 목록 조회 바로 뒤에 다른 사람 메모 조회를 이어서 보냅니다.
   results.push(attackResult(
-    'anonymous_notes_list_rejected',
+    'anonymous_notes_list_rejected', 3,
     '인증 헤더 없는 GET /api/notes는 HTTP 401',
     await requestObservation(new URL('/api/notes', app), {}, 'anonymous_notes_list_rejected'),
   ));
   results.push(attackResult(
-    'anonymous_note_item_rejected',
+    'anonymous_note_item_rejected', 4,
     '인증 헤더 없이 다른 사람 메모 GET /api/notes/<자료 ID>는 HTTP 401',
     await requestObservation(new URL('/api/notes/00000000-0000-4000-8000-000000000000', app), {}, 'anonymous_note_item_rejected'),
   ));
   results.push(attackResult(
-    'fake_token_rejected',
+    'fake_token_rejected', 3,
     '가짜 Bearer 토큰을 보낸 GET /api/notes는 HTTP 401',
     await requestObservation(new URL('/api/notes', app), {
       headers: { Authorization: 'Bearer aaaa.bbbb.cccc' },
@@ -133,23 +136,23 @@ export async function runAttackChecks(input) {
   ));
 
   results.push(attackResult(
-    'anonymous_restore_route_rejected',
+    'anonymous_restore_route_rejected', 10,
     '인증 헤더 없는 GET /api/restore는 HTTP 401',
     await requestObservation(new URL('/api/restore', app), {}, 'anonymous_restore_route_rejected'),
   ));
   results.push(attackResult(
-    'anonymous_ops_room_rejected',
+    'anonymous_ops_room_rejected', 12,
     '인증 헤더 없는 GET /api/ops는 HTTP 401',
     await requestObservation(new URL('/api/ops', app), {}, 'anonymous_ops_room_rejected'),
   ));
   results.push(attackResult(
-    'installed_marker_without_login_rejected',
+    'installed_marker_without_login_rejected', 11,
     '설치 표시만 붙인 로그인 없는 GET /api/notes는 HTTP 401',
     await requestObservation(new URL('/api/notes', app), { headers: { 'x-aleph-app': 'installed' } }, 'installed_marker_without_login_rejected'),
   ));
 
   results.push(attackResult(
-    'original_table_path_not_exposed',
+    'original_table_path_not_exposed', 5,
     '배포 주소에서 원본 표 경로 GET /rest/v1/training_notes는 HTTP 404',
     await requestObservation(new URL('/rest/v1/training_notes', app), {}, 'original_table_path_not_exposed'),
   ));

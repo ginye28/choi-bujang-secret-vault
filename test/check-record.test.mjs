@@ -85,6 +85,16 @@ test('제출 점검 기록과 같은 응답을 받으면 같은 결과가 나온
     });
     const summary = summarizeCheckRecord(buildCheckRecord(attempts));
     assert.deepEqual(summary.counts, { total: attempts.length, blocked: attempts.length, breached: 0, notRun: 0 });
+    for (const attempt of attempts) {
+      assert.deepEqual(Object.keys(attempt).sort(), ['attackId', 'expected', 'observed', 'result', 'stage']);
+      assert.equal(attempt.result, 'blocked');
+      assert.ok(Number.isInteger(attempt.stage));
+    }
+    globalThis.fetch = async () => { throw new TypeError('blocked by sandbox'); };
+    const offline = await runAttackChecks('https://student-defense.vercel.app/');
+    assert.ok(offline.every((attempt) => attempt.observed === 'not_run' && attempt.result === 'not_run'));
+    assert.deepEqual(summarizeCheckRecord(buildCheckRecord(offline)).counts,
+      { total: offline.length, blocked: 0, breached: 0, notRun: offline.length });
   } finally {
     globalThis.fetch = originalFetch;
   }
