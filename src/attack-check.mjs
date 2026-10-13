@@ -1,5 +1,6 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
+// 12단계 제출 묶음은 읽기(GET·HEAD) 요청만 보낼 수 있습니다. 쓰기 요청 점검은 여기에 두지 않습니다.
 function publicApp(config) {
   let app;
   try {
@@ -75,9 +76,9 @@ export async function runAttackChecks(config) {
     await requestObservation(new URL('/api/notes', app)),
   ));
   results.push(attackResult(
-    'anonymous_note_write_rejected',
-    '인증 헤더 없는 POST /api/notes는 HTTP 401',
-    await requestObservation(new URL('/api/notes', app), { method: 'POST' }),
+    'anonymous_note_item_rejected',
+    '인증 헤더 없는 GET /api/notes/<자료 ID>는 HTTP 401',
+    await requestObservation(new URL('/api/notes/00000000-0000-4000-8000-000000000000', app)),
   ));
   results.push(attackResult(
     'fake_token_rejected',
@@ -88,9 +89,9 @@ export async function runAttackChecks(config) {
   ));
 
   results.push(attackResult(
-    'anonymous_restore_rejected',
-    '인증 헤더 없는 POST /api/restore는 HTTP 401',
-    await requestObservation(new URL('/api/restore', app), { method: 'POST' }),
+    'anonymous_restore_route_rejected',
+    '인증 헤더 없는 GET /api/restore는 HTTP 401',
+    await requestObservation(new URL('/api/restore', app)),
   ));
   results.push(attackResult(
     'anonymous_ops_room_rejected',
