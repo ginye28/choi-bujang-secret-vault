@@ -13,7 +13,8 @@ import checksHandler from '../api/checks.js';
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 test('관측 값은 HTTP 상태로만 막음·뚫림·미실행을 나눈다', () => {
-  assert.equal(classifyAttempt({ attackId: 'public_data_json_gone', observed: 'HTTP 404; method=GET' }), 'blocked');
+  assert.equal(classifyAttempt({ attackId: 'anonymous_ops_room_rejected', observed: 'HTTP 401; method=GET' }), 'blocked');
+  assert.equal(classifyAttempt({ attackId: 'anonymous_ops_room_rejected', observed: 'HTTP 404; method=GET' }), 'breached');
   assert.equal(classifyAttempt({ attackId: 'anonymous_notes_list_rejected', observed: 'HTTP 200; method=GET' }), 'breached');
   assert.equal(classifyAttempt({ attackId: 'anonymous_notes_list_rejected', observed: 'not_run' }), 'not_run');
   assert.equal(classifyAttempt({ attackId: 'unknown_check', observed: 'HTTP 401; method=GET' }), 'breached');
@@ -21,9 +22,9 @@ test('관측 값은 HTTP 상태로만 막음·뚫림·미실행을 나눈다', (
 
 test('기록의 수치는 점검을 하나씩 센 값이고 합이 점검 수와 같다', () => {
   const record = buildCheckRecord([
-    { attackId: 'public_data_json_gone', expected: 'HTTP 404', observed: 'HTTP 404; method=GET' },
+    { attackId: 'anonymous_ops_room_rejected', expected: 'HTTP 401', observed: 'HTTP 401; method=GET' },
     { attackId: 'anonymous_notes_list_rejected', expected: 'HTTP 401', observed: 'HTTP 200; method=GET' },
-    { attackId: 'original_table_path_not_exposed', expected: 'HTTP 404', observed: 'not_run' },
+    { attackId: 'anonymous_device_route_rejected', expected: 'HTTP 401', observed: 'not_run' },
   ], { checkedAt: new Date('2026-10-13T00:00:00Z') });
   const summary = summarizeCheckRecord(record);
   assert.deepEqual(summary.recorded, { total: 3, blocked: 1, breached: 1, notRun: 1 });
@@ -62,15 +63,15 @@ test('방금 만든 제출 묶음이 있으면 그 결과(미실행 포함)로 �
   assert.equal(loadCheckRecord(base), null);
   mkdirSync(join(dir, 'docs'));
   writeFileSync(join(dir, 'docs', 'check-record.json'), JSON.stringify(buildCheckRecord([
-    { attackId: 'public_data_json_gone', expected: 'HTTP 404', observed: 'HTTP 404; method=GET' },
+    { attackId: 'anonymous_ops_room_rejected', expected: 'HTTP 401', observed: 'HTTP 401; method=GET' },
   ])));
   assert.equal(loadCheckRecord(base).source, 'docs/check-record.json');
   mkdirSync(join(dir, 'artifacts'));
   writeFileSync(join(dir, 'artifacts', 'submission.json'), JSON.stringify({
     schema: 'aleph.defense.submission.v2',
     attackAttempts: [
-      { attackId: 'public_data_json_gone', expected: 'HTTP 404', observed: 'HTTP 404; method=GET' },
-      { attackId: 'original_table_path_not_exposed', expected: 'HTTP 404', observed: 'not_run' },
+      { attackId: 'anonymous_ops_room_rejected', expected: 'HTTP 401', observed: 'HTTP 401; method=GET' },
+      { attackId: 'anonymous_device_route_rejected', expected: 'HTTP 401', observed: 'not_run' },
     ],
   }));
   const summary = summarizeCheckRecord(loadCheckRecord(base));
@@ -82,7 +83,7 @@ test('방금 만든 제출 묶음이 있으면 그 결과(미실행 포함)로 �
 test('제출 점검 기록과 같은 응답을 받으면 같은 결과가 나온다', async () => {
   const originalFetch = globalThis.fetch;
   try {
-    globalThis.fetch = async (url) => new Response('{}', { status: /\/data\.json$|\/rest\/v1\//u.test(String(url)) ? 404 : 401 });
+    globalThis.fetch = async () => new Response('{}', { status: 401 });
     const attempts = await runAttackChecks({
       step: 12, publicAppUrl: 'https://student-defense.vercel.app/', originalApiUrl: 'https://db.example.org/rest/v1/notes',
     });

@@ -12,4 +12,4 @@ const attempts = await runAttackChecks(config);
 const record = buildCheckRecord(attempts);
 writeFileSync(join(root, 'docs', 'check-record.json'), `${JSON.stringify(record, null, 2)}\n`, 'utf8');
 const { counts } = summarizeCheckRecord(record);
-process.stdout.write(`제출 점검 기록 작성: 점검 ${counts.total}건 · 막음 ${counts.blocked} · 뚫림 ${counts.breached} · 미실행 ${counts.notRun}\n`);
+process.stdout.write(`제출 점검 기록 작성: 41종 중 실제 API 실행 ${counts.executed}종 · 막음 ${counts.blocked} · 뚫림 ${counts.breached} · 미실행 ${counts.notRun}\n`);

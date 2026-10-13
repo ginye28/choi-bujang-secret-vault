@@ -156,6 +156,7 @@ test('제출 묶음 점검은 읽기 요청만 보내고 alephEvidence 로 점�
       step: 12, publicAppUrl: 'https://student-defense.vercel.app/', originalApiUrl: 'https://db.example.org/rest/v1/notes',
     });
     assert.equal(seen.length, results.length);
+    assert.equal(new Set(seen.map(({ url }) => url)).size, seen.length, '점검마다 서로 다른 경로');
     assert.ok(seen.every(({ url }) => url.startsWith('https://student-defense.vercel.app/')), '배포 주소로만 보냄');
     results.forEach((result, index) => {
       const { init, url } = seen[index];

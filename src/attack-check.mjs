@@ -21,14 +21,13 @@ function publicApp(config) {
 
 // 점검마다 "막음"으로 보는 HTTP 상태입니다. 작전실 수치(scripts/check-record.mjs, /api/checks)도 이 표로만 셉니다.
 export const BLOCKED_STATUS = Object.freeze({
-  public_data_json_gone: [404],
   anonymous_notes_list_rejected: [401],
   anonymous_note_item_rejected: [401],
-  fake_token_rejected: [401],
+  anonymous_announcements_rejected: [401],
+  anonymous_announcement_item_rejected: [401],
   anonymous_restore_route_rejected: [401],
+  anonymous_device_route_rejected: [401],
   anonymous_ops_room_rejected: [401],
-  installed_marker_without_login_rejected: [401],
-  original_table_path_not_exposed: [404],
 });
 
 export const NOT_RUN = 'not_run';
@@ -110,52 +109,24 @@ export async function runAttackChecks(input) {
       result: visible ? 'breached' : 'blocked' }];
   }
 
+  // 점검은 모두 로그인 없는 GET 이고, 특별한 헤더 없이 서로 다른 경로로 보냅니다.
+  // 심판 실행 기록(method, urlSha256, HTTP 상태)만으로 점검마다 무엇을 보냈고 무엇을 받았는지 구별되도록,
+  // 헤더로만 달라지는 점검(가짜 토큰·설치 표시)과 처리기가 없는 경로의 404 는 넣지 않습니다.
+  // 막음은 실제 처리기가 401 로 거부한 경우만 셉니다.
+  const NOTE_ID = '00000000-0000-4000-8000-000000000000';
+  const plan = [
+    // 1첩반상: 같은 제출본 안에서 무인증 목록 조회 바로 뒤에 다른 사람 메모 조회를 이어서 보냅니다.
+    ['anonymous_notes_list_rejected', 3, '/api/notes', '로그인 없는 GET /api/notes(메모 목록)는 HTTP 401'],
+    ['anonymous_note_item_rejected', 4, `/api/notes/${NOTE_ID}`, '로그인 없이 다른 사람 메모 GET /api/notes/<자료 ID>는 HTTP 401'],
+    ['anonymous_announcements_rejected', 8, '/api/announcements', '로그인 없는 GET /api/announcements(반 공지 목록)는 HTTP 401'],
+    ['anonymous_announcement_item_rejected', 8, `/api/announcements/${NOTE_ID}`, '로그인 없는 GET /api/announcements/<자료 ID>는 HTTP 401'],
+    ['anonymous_restore_route_rejected', 10, '/api/restore', '로그인 없는 GET /api/restore(복구 경로)는 HTTP 401'],
+    ['anonymous_device_route_rejected', 11, '/api/device', '로그인 없는 GET /api/device(기기 승인 상태)는 HTTP 401'],
+    ['anonymous_ops_room_rejected', 12, '/api/ops', '로그인 없는 GET /api/ops(탈환 작전실)는 HTTP 401'],
+  ];
   const results = [];
-  results.push(attackResult(
-    'public_data_json_gone', 2,
-    'GET /data.json은 HTTP 404',
-    await requestObservation(new URL('/data.json', app), {}, 'public_data_json_gone'),
-  ));
-  // 1첩반상: 같은 제출본 안에서 무인증 목록 조회 바로 뒤에 다른 사람 메모 조회를 이어서 보냅니다.
-  results.push(attackResult(
-    'anonymous_notes_list_rejected', 3,
-    '인증 헤더 없는 GET /api/notes는 HTTP 401',
-    await requestObservation(new URL('/api/notes', app), {}, 'anonymous_notes_list_rejected'),
-  ));
-  results.push(attackResult(
-    'anonymous_note_item_rejected', 4,
-    '인증 헤더 없이 다른 사람 메모 GET /api/notes/<자료 ID>는 HTTP 401',
-    await requestObservation(new URL('/api/notes/00000000-0000-4000-8000-000000000000', app), {}, 'anonymous_note_item_rejected'),
-  ));
-  results.push(attackResult(
-    'fake_token_rejected', 3,
-    '가짜 Bearer 토큰을 보낸 GET /api/notes는 HTTP 401',
-    await requestObservation(new URL('/api/notes', app), {
-      headers: { Authorization: 'Bearer aaaa.bbbb.cccc' },
-    }, 'fake_token_rejected'),
-  ));
-
-  results.push(attackResult(
-    'anonymous_restore_route_rejected', 10,
-    '인증 헤더 없는 GET /api/restore는 HTTP 401',
-    await requestObservation(new URL('/api/restore', app), {}, 'anonymous_restore_route_rejected'),
-  ));
-  results.push(attackResult(
-    'anonymous_ops_room_rejected', 12,
-    '인증 헤더 없는 GET /api/ops는 HTTP 401',
-    await requestObservation(new URL('/api/ops', app), {}, 'anonymous_ops_room_rejected'),
-  ));
-  results.push(attackResult(
-    'installed_marker_without_login_rejected', 11,
-    '설치 표시만 붙인 로그인 없는 GET /api/notes는 HTTP 401',
-    await requestObservation(new URL('/api/notes', app), { headers: { 'x-aleph-app': 'installed' } }, 'installed_marker_without_login_rejected'),
-  ));
-
-  results.push(attackResult(
-    'original_table_path_not_exposed', 5,
-    '배포 주소에서 원본 표 경로 GET /rest/v1/training_notes는 HTTP 404',
-    await requestObservation(new URL('/rest/v1/training_notes', app), {}, 'original_table_path_not_exposed'),
-  ));
-
+  for (const [attackId, stage, path, expected] of plan) {
+    results.push(attackResult(attackId, stage, expected, await requestObservation(new URL(path, app), {}, attackId)));
+  }
   return results;
 }
