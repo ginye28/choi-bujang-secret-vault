@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from 'node:crypto';
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 // 12단계 제출 묶음은 읽기(GET·HEAD) 요청만 보낼 수 있습니다. 쓰기 요청 점검은 여기에 두지 않습니다.
@@ -15,11 +16,12 @@ function publicApp(config) {
   return app;
 }
 
+// 요청마다 새 요청 ID(randomUUID)를 보내고, 응답 본문의 sha256(본문 자체는 남기지 않음)과 확인 시각을
+// observed 에 적습니다. 서버는 같은 요청 ID 로 응답 해시를 기록하므로 서버 기록과 맞춰 볼 수 있습니다.
+// 요청을 보내지 못한 점검은 observed 를 not_run 으로 적습니다.
 async function requestObservation(url, options = {}, attackId = null) {
-  // 12단계: 서버 요청 기록과 맞춰 볼 수 있도록 요청마다 점검 이름을 헤더로 붙입니다(읽기 요청만 보냅니다).
-  const tagged = attackId === null ? {} : {
-    'x-aleph-attack-id': attackId, 'x-attack-id': attackId, 'x-request-id': attackId,
-  };
+  const requestId = randomUUID();
+  const tagged = attackId === null ? {} : { 'x-request-id': requestId, 'x-aleph-attack-id': attackId };
   try {
     const response = await fetch(url, {
       ...options,
@@ -27,16 +29,23 @@ async function requestObservation(url, options = {}, attackId = null) {
       redirect: 'error',
       signal: AbortSignal.timeout(10000),
     });
+    let text = '';
+    try {
+      text = typeof response.text === 'function' ? await response.text() : JSON.stringify(await response.json());
+    } catch {
+      // 본문을 읽지 못해도 상태만으로 기록합니다.
+    }
     let isJson = false;
     try {
-      await response.json();
+      JSON.parse(text);
       isJson = true;
     } catch {
-      // Record only whether the response was JSON, never its contents.
+      // JSON 이 아니면 아니요로 기록합니다. 본문은 남기지 않습니다.
     }
-    const echoed = response.headers.get('x-request-id');
-    const suffix = echoed && attackId !== null ? `; 서버 요청 ID: ${echoed.slice(0, 64)}` : '';
-    return `HTTP ${response.status}; JSON: ${isJson ? '예' : '아니요'}${suffix}`;
+    const digest = createHash('sha256').update(text, 'utf8').digest('hex');
+    const checkedAt = new Date().toISOString();
+    const base = `HTTP ${response.status}; JSON: ${isJson ? '예' : '아니요'}`;
+    return attackId === null ? base : `${base}; 요청 ID: ${requestId}; 응답 sha256: ${digest}; 확인 시각: ${checkedAt}`;
   } catch {
     return 'not_run';
   }

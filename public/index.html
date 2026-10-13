@@ -433,7 +433,7 @@
       recent.replaceChildren();
       for (const item of events.recent) {
         const entry = document.createElement('li');
-        entry.textContent = `${item.at} · ${item.method} ${item.route} → ${item.status} ${item.outcome}${item.reason ? ` (${item.reason})` : ''} · 요청 ID ${item.requestId}${item.attackId ? ` · 점검 ${item.attackId}` : ''}`;
+        entry.textContent = `${item.at} · ${item.method} ${item.route} → ${item.status} ${item.outcome}${item.reason ? ` (${item.reason})` : ''} · 요청 ID ${item.requestId}${item.attackId ? ` · 점검 ${item.attackId}` : ''}${item.sha256 ? ` · 응답 sha256 ${item.sha256.slice(0, 16)}` : ''}`;
         recent.append(entry);
       }
       const verification = report.verification;

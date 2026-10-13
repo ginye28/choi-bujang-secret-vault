@@ -142,3 +142,20 @@ test('제출 묶음 점검은 읽기 요청만 보내고 점검 이름을 붙인
   assert.equal(/method:\s*'(?:POST|PUT|PATCH|DELETE)'/u.test(source), false);
   assert.ok(source.includes("'x-aleph-attack-id': attackId"));
 });
+
+test('서버 기록은 응답 본문의 sha256만 남기고 본문은 남기지 않는다', async () => {
+  const { createHash } = await import('node:crypto');
+  const body = { error: 'UNAUTHORIZED', reason: 'LOGIN_REQUIRED' };
+  const event = buildEvent({ request: { method: 'GET', url: '/api/notes', headers: {} }, status: 401, body, requestId: 'req-hash' });
+  assert.equal(event.sha256, createHash('sha256').update(JSON.stringify(body), 'utf8').digest('hex'));
+  assert.equal(JSON.stringify(event).includes('LOGIN_REQUIRED') && JSON.stringify(event).includes('"body"'), false);
+  const summary = summarizeEvents([event], null);
+  assert.equal(summary.recent[0].sha256, event.sha256);
+});
+
+test('제출 묶음 점검은 randomUUID 요청 ID·응답 sha256·확인 시각을 observed 에 적는다', () => {
+  const source = read('src/attack-check.mjs');
+  for (const word of ['randomUUID', 'createHash', "'x-request-id': requestId", '응답 sha256', '확인 시각']) {
+    assert.ok(source.includes(word), word);
+  }
+});

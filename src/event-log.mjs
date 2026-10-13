@@ -73,6 +73,12 @@ export function outcomeOf(status) {
   return 'allowed';
 }
 
+// 응답 본문의 sha256. 본문은 기록하지 않고 해시만 남겨, 호출한 쪽이 받은 응답의 해시와 맞춰 볼 수 있게 합니다.
+export function bodySha256(body) {
+  const text = body === undefined ? '' : JSON.stringify(body);
+  return createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
 export function buildEvent({ request, status, body, now = new Date(), requestId }) {
   const authorization = header(request.headers, 'authorization');
   const subject = authorization === '' ? null : unverifiedSubject(authorization);
@@ -82,7 +88,7 @@ export function buildEvent({ request, status, body, now = new Date(), requestId 
   return {
     v: 1, requestId, at: now.toISOString(), method: String(request.method ?? 'GET').toUpperCase().slice(0, 7),
     route: maskedRoute(request), status, outcome: outcomeOf(status), reason: reasonOf(body),
-    attackId: attackTagOf(request.headers), actor,
+    attackId: attackTagOf(request.headers), sha256: bodySha256(body), actor,
   };
 }
 
@@ -127,6 +133,7 @@ export function summarizeEvents(events, viewerRef = null) {
   const recent = visible.slice(0, RECENT_LIMIT).map((event) => ({
     requestId: event.requestId, at: event.at, method: event.method, route: event.route,
     status: event.status, outcome: event.outcome, reason: event.reason, attackId: event.attackId,
+    sha256: typeof event.sha256 === 'string' ? event.sha256 : null,
     actor: event.actor?.kind ?? 'anonymous',
   }));
   const byRule = new Map();
