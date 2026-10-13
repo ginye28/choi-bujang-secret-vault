@@ -23,43 +23,27 @@ const outcome = async (r) => {
   return { decision: out.decision, reasonCode: out.reasonCode, ruleIds: out.ruleIds };
 };
 
-test('자기 메모 읽기·수정은 허용된다', async () => {
-  resetNoteOwners();
+test('자기 메모 읽기는 허용되고 수정은 판정기에서 열지 않는다', async () => {
   for (const [method, path, route] of [
     ['GET', `/notes/${NOTE_ID}`, 'GET /notes/:id'],
-    ['PUT', `/notes/${NOTE_ID}`, 'PUT /notes/:id'],
     ['GET', '/notes/demo', 'GET /notes/:id'],
   ]) {
     const out = await outcome(request(method, path, route));
     assert.equal(out.decision, 'allow', `${route} ${path}`);
     assert.ok(out.ruleIds.every((id) => RULE_IDS.includes(id)));
   }
+  const write = await outcome(request('PUT', `/notes/${NOTE_ID}`, 'PUT /notes/:id'));
+  assert.deepEqual([write.decision, write.reasonCode], ['deny', 'route_not_allowed']);
 });
 
-test('먼저 읽은 주체가 메모 소유자가 되고 다른 주체의 읽기·수정은 거부된다', async () => {
+test('기준 주체(learner_fixture)가 아닌 주체의 메모 읽기·수정은 거부된다', async () => {
   resetNoteOwners();
-  const id = randomUUID();
-  const path = `/notes/${id}`;
-  const as = (subjectId) => ({ subjectId });
-
-  // 소유자를 아직 모르는 자료의 수정은 열지 않는다.
-  const blindPut = await outcome(request('PUT', path, 'PUT /notes/:id', as('learner_a')));
-  assert.deepEqual([blindPut.decision, blindPut.reasonCode], ['deny', 'route_not_allowed']);
-
-  const ownRead = await outcome(request('GET', path, 'GET /notes/:id', as('learner_a')));
-  assert.deepEqual([ownRead.decision, ownRead.reasonCode], ['allow', 'approved']);
-  const ownWrite = await outcome(request('PUT', path, 'PUT /notes/:id', as('learner_a')));
-  assert.deepEqual([ownWrite.decision, ownWrite.reasonCode], ['allow', 'approved']);
-
   for (const method of ['GET', 'PUT']) {
-    const other = await outcome(request(method, path, `${method} /notes/:id`, as('learner_b')));
-    assert.deepEqual([other.decision, other.reasonCode], ['deny', 'zone_other_owner'], method);
-    assert.ok(other.ruleIds.every((rule) => RULE_IDS.includes(rule)));
+    const out = await outcome(request(method, `/notes/${NOTE_ID}`, `${method} /notes/:id`,
+      { subjectId: 'learner_other' }));
+    assert.equal(out.decision, 'deny', method);
+    assert.ok(['zone_other_owner', 'route_not_allowed'].includes(out.reasonCode), method);
   }
-
-  // 다른 주체의 거부가 소유자를 바꾸지 않는다.
-  const again = await outcome(request('GET', path, 'GET /notes/:id', as('learner_a')));
-  assert.equal(again.decision, 'allow');
 });
 
 test('목록·생성·삭제는 구역 규칙이 열지 않고, 쿼리가 붙은 자료 경로도 거부한다', async () => {
@@ -93,9 +77,9 @@ test('ID에 소유자 표지가 있으면 subjectId와 일치하는 메모만 �
   assert.deepEqual([unmarked.decision, unmarked.reasonCode], ['allow', 'approved']);
 });
 
-test('공지는 읽을 수 있고 일반 학생의 공지 수정은 거부된다', async () => {
+test('판정기는 공지 읽기·쓰기 모두 열지 않고 쓰기는 공지 쓰기 거부 사유를 쓴다', async () => {
   const read = await outcome(request('GET', '/announcements/announcement_1', 'GET /announcements/:id'));
-  assert.equal(read.decision, 'allow');
+  assert.deepEqual([read.decision, read.reasonCode], ['deny', 'route_not_allowed']);
   for (const [method, path, route] of [
     ['PUT', '/announcements/announcement_1', 'PUT /announcements/:id'],
     ['PATCH', '/announcements/announcement_1', 'PATCH /announcements/:id'],

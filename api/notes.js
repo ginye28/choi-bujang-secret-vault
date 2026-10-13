@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { isNoteResourceId } from '../src/resource-ids.mjs';
+import { BACKUP_LIKE, backupCurrentNote, isBackupTitle, recordBackup } from '../src/note-backup.mjs';
 
 let services;
 
@@ -55,6 +56,15 @@ function noteFromRow(row) {
   return { id: row.id, title: row.title, body: row.content };
 }
 
+// 사본 저장은 메모 API 의 응답을 막지 않도록 최선 노력으로 합니다. 실패 사실만 서버 로그에 남깁니다.
+async function saveBackupSafely(supabase, note) {
+  try { await recordBackup(supabase, note); } catch { console.error('note_backup_failed'); }
+}
+
+async function backupBeforeChange(supabase, target) {
+  try { await backupCurrentNote(supabase, target); } catch { console.error('note_backup_failed'); }
+}
+
 function notFound(response) {
   // Same response for absent and non-owned notes prevents ID enumeration.
   return response.status(404).json({ error: 'NOT_FOUND', reason: 'OWNER_MISMATCH_OR_NOT_FOUND' });
@@ -94,7 +104,8 @@ export default async function handler(request, response) {
       const { data, error } = await supabase
         .from('training_notes')
         .select('id, title, content')
-        .eq('owner_id', identity.userId);
+        .eq('owner_id', identity.userId)
+        .not('title', 'like', BACKUP_LIKE);
       if (error || !Array.isArray(data)) {
         return response.status(500).json({ error: 'NOTES_SERVICE_UNAVAILABLE' });
       }
@@ -109,7 +120,7 @@ export default async function handler(request, response) {
         .eq('owner_id', identity.userId)
         .maybeSingle();
       if (error) return response.status(500).json({ error: 'NOTES_SERVICE_UNAVAILABLE' });
-      if (!data) return notFound(response);
+      if (!data || isBackupTitle(data.title)) return notFound(response);
       return response.status(200).json(noteFromRow(data));
     }
 
@@ -137,12 +148,14 @@ export default async function handler(request, response) {
       if (error || !data) {
         return response.status(500).json({ error: 'NOTES_SERVICE_UNAVAILABLE' });
       }
+      await saveBackupSafely(supabase, { id: data.id, owner: identity.userId, title: body.title, content: body.body });
       return response.status(201).json({ id: data.id });
     }
 
     if (method === 'PUT' && hasId) {
       const body = requestBody(request);
       if (!isNoteBody(body)) return response.status(400).json({ error: 'INVALID_BODY' });
+      await backupBeforeChange(supabase, { id, owner: identity.userId });
       const { data, error } = await supabase
         .from('training_notes')
         .update({ title: body.title, content: body.body })
@@ -152,10 +165,12 @@ export default async function handler(request, response) {
         .maybeSingle();
       if (error) return response.status(500).json({ error: 'NOTES_SERVICE_UNAVAILABLE' });
       if (!data) return notFound(response);
+      await saveBackupSafely(supabase, { id: data.id, owner: identity.userId, title: body.title, content: body.body });
       return response.status(200).json({ id: data.id });
     }
 
     if (method === 'DELETE' && hasId) {
+      await backupBeforeChange(supabase, { id, owner: identity.userId });
       const { data, error } = await supabase
         .from('training_notes')
         .delete()

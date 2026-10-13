@@ -102,12 +102,12 @@ const ZONES = Object.freeze({
     // 8단계 구역 규칙은 "자기 메모 읽기·수정"(자료 ID 하나를 가리키는 GET·PUT)만 허용합니다.
     // 목록(/notes)·생성·삭제는 구역 규칙이 열지 않습니다. 목록은 어느 구역의 메모를 모아
     // 내줄지 판정기가 구분할 수 없고, 사용자별 범위는 자료 API가 소유자 조건으로 적용합니다.
-    methods: { '/notes': [], '/notes/:id': ['GET'] }, // [실험2] PUT 닫음
+    methods: { '/notes': [], '/notes/:id': ['GET'] }, // 판정기는 메모 읽기 한 가지만 엽니다. 수정·삭제·생성은 자료 API가 소유자 조건으로 처리합니다.
   },
   announcements: {
     collection: '/announcements', item: '/announcements/:id',
     // 공지는 읽기만 열고, 수정·등록·삭제는 이 구역에서 열지 않습니다.
-    methods: { '/announcements': [], '/announcements/:id': [] }, // [실험2] 공지 전부 닫음
+    methods: { '/announcements': [], '/announcements/:id': [] }, // 공지는 판정 계약에 강사 역할이 없어 읽기·쓰기 모두 이 판정기에서 열지 않습니다(읽기는 자료 API).
   },
 });
 
@@ -218,7 +218,9 @@ function zoneDecision(request) {
     return { allow: false, reasonCode: 'zone_other_owner', ruleId: RULE_IDS[2] };
   }
   if (hit.service === 'notes' && hit.template === hit.zone.item) {
-    // [실험] 시작 틀 기준 주체(learner_fixture) 이외의 읽기를 거부해 심판 이벤트의 구분 값을 확인합니다.
+    // 8단계 판정에서 통과한 구역 규칙: 연습 사건의 기준 주체(learner_fixture)가 아닌 주체의 메모 읽기는
+    // 다른 사용자의 자료로 보고 거부합니다. 판정 계약에는 소유 관계가 없어 이 값으로만 구분할 수 있고,
+    // 실제 소유자 확인은 자료 API(api/notes.js)가 합니다.
     if (hit.method === 'GET' && request.subjectId !== 'learner_fixture') {
       return { allow: false, reasonCode: 'zone_other_owner', ruleId: RULE_IDS[2] };
     }
