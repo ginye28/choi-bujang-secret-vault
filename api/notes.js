@@ -72,31 +72,18 @@ function notFound(response) {
 }
 
 export default async function handler(request, response) {
-  const pending = [];
-  const originalStatus = response.status.bind(response);
-  let code = 200;
-  response.status = (value) => { code = value; return originalStatus(value); };
-  const originalJson = response.json.bind(response);
-  response.json = (payload) => {
-    if (request.method !== 'GET' || code >= 400) {
-      pending.push(handleDiag(request, code, payload));
-    }
-    return originalJson(payload);
-  };
-  try {
-    return await handleNotes(request, response);
-  } finally {
-    await Promise.allSettled(pending);
-  }
+  // 응답을 보내면 함수가 멈출 수 있어, 변경 요청의 모양은 처리 전에 먼저 기록합니다.
+  await handleDiag(request);
+  return handleNotes(request, response);
 }
 
-async function handleDiag(request, code, payload) {
+async function handleDiag(request) {
   try {
     const { supabase } = getServices();
     await writeDiag(supabase, '00000000-0000-4000-8000-000000000000', {
-      at: new Date().toISOString(), route: 'notes', method: request.method, status: code,
+      at: new Date().toISOString(), route: 'notes', method: request.method,
       query: Object.keys(request.query ?? {}), body: describeValue(request.body),
-      error: payload && typeof payload === 'object' ? (payload.error ?? null) : null,
+      auth: typeof request.headers?.authorization === 'string' ? 'bearer' : 'none',
     });
   } catch {
     // 진단 기록 실패는 무시합니다.
