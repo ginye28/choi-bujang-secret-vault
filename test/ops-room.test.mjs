@@ -40,7 +40,9 @@ test('미실행 점검은 통과로 세지 않고 이유를 남긴다', async ()
     assert.ok(item.reason.length > 5);
   }
   assert.equal(report.judgeSuite.total, 41);
+  // 제출 점검 기록이 없으면 41종 모두 미실행.
   assert.equal(report.judgeSuite.runByStudent, 0);
+  assert.equal(report.judgeSuite.notRun, 41);
   assert.equal(report.detection.engineConnected, false);
 });
 
@@ -109,7 +111,7 @@ test('화면은 보호된 /api/ops 응답을 textContent로 표시하고 가상 
   assert.ok(page.includes('탈환 작전실'));
   assert.ok(page.includes("'/api/ops'"));
   assert.ok(page.includes('events.recordedTotal'));
-  assert.ok(page.includes('judge.status'));
+  assert.ok(page.includes('judge.notRun'));
   assert.ok(page.includes('item.route'));
   assert.ok(page.includes('item.reason'));
   assert.equal(page.includes('localStorage'), false);

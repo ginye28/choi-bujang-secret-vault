@@ -59,19 +59,25 @@ export function summarizeCheckRecord(record) {
       observed: text(item.observed, 300),
       result: classifyAttempt(item),
     }));
-  const counts = { total: rows.length, blocked: 0, breached: 0, notRun: 0 };
+  // 기록에 남은 점검 그대로의 수(보내지 못한 점검은 notRun).
+  const recorded = { total: rows.length, blocked: 0, breached: 0, notRun: 0 };
   for (const row of rows) {
-    if (row.result === 'blocked') counts.blocked += 1;
-    else if (row.result === 'breached') counts.breached += 1;
-    else counts.notRun += 1;
+    if (row.result === 'blocked') recorded.blocked += 1;
+    else if (row.result === 'breached') recorded.breached += 1;
+    else recorded.notRun += 1;
   }
+  // 41종 시험 기준 수치: 실제 API 로 실행해 응답이 기록된 점검만 「실행」으로 세고(막음·뚫림),
+  // 기록이 없거나 보내지 못한 나머지는 모두 「미실행」입니다. 미실행은 막음·통과로 세지 않습니다.
+  const executed = Math.min(recorded.blocked + recorded.breached, JUDGE_SUITE_TOTAL);
   return {
     available: rows.length > 0,
     checkedAt: rows.length > 0 ? text(record.checkedAt, 40) || null : null,
     source: rows.length > 0 ? text(record.source, 40) || null : null,
-    counts,
+    counts: {
+      total: JUDGE_SUITE_TOTAL, executed, blocked: recorded.blocked, breached: recorded.breached,
+      notRun: JUDGE_SUITE_TOTAL - executed,
+    },
+    recorded,
     rows,
-    // 심판의 41종 시험 결과는 이 기록에 없습니다. 막음·통과로 세지 않고 미실행으로만 둡니다.
-    judgeSuite: { total: JUDGE_SUITE_TOTAL, recorded: 0, status: '미실행' },
   };
 }

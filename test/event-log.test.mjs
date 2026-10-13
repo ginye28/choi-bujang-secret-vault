@@ -111,7 +111,8 @@ test('작전실은 가린 서버 기록과 일치하는 요약만 제공하고 �
   assert.equal(report.events.recent[0].requestId, 'server-request-42');
   assert.equal(report.events.denyByRule.find((item) => item.rule === 'LOGIN_REQUIRED')?.count, 1);
   assert.deepEqual(report.events.outcomes, { blocked: 1, allowed: 0, errors: 0 });
-  assert.deepEqual(report.judgeSuite, { ...report.judgeSuite, total: TOTAL_ATTACKS, recorded: 0, status: '미실행' });
+  assert.equal(report.judgeSuite.total, TOTAL_ATTACKS);
+  assert.equal(report.judgeSuite.runByStudent + report.judgeSuite.notRun, TOTAL_ATTACKS);
   const json = JSON.stringify(report.events);
   assert.equal(json.includes(secretId), false);
   assert.equal(json.includes('private=query'), false);
@@ -134,7 +135,8 @@ test('작전실 기록을 읽지 못했을 때는 서버 기록 상태와 공격
   const report = buildOpsReport({ rows, recovery: [], devices: [] });
   assert.equal(report.events.available, false);
   assert.deepEqual(report.events.outcomes, { blocked: 0, allowed: 0, errors: 0 });
-  assert.equal(report.judgeSuite.status, '미실행');
+  assert.equal(report.judgeSuite.runByStudent, 0);
+  assert.equal(report.judgeSuite.notRun, TOTAL_ATTACKS);
   const page = read('public/index.html');
   assert.ok(page.includes('서버 요청 기록을 읽지 못했습니다(미실행).'));
 });

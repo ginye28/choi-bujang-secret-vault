@@ -26,10 +26,12 @@ test('기록의 수치는 점검을 하나씩 센 값이고 합이 점검 수와
     { attackId: 'original_table_path_not_exposed', expected: 'HTTP 404', observed: 'not_run' },
   ], { checkedAt: new Date('2026-10-13T00:00:00Z') });
   const summary = summarizeCheckRecord(record);
-  assert.deepEqual(summary.counts, { total: 3, blocked: 1, breached: 1, notRun: 1 });
+  assert.deepEqual(summary.recorded, { total: 3, blocked: 1, breached: 1, notRun: 1 });
+  // 41종 기준: 응답이 기록된 2종만 실행, 나머지 39종(보내지 못한 1건 포함)은 미실행.
+  assert.deepEqual(summary.counts, { total: 41, executed: 2, blocked: 1, breached: 1, notRun: 39 });
+  assert.equal(summary.counts.executed + summary.counts.notRun, 41);
   assert.equal(summary.checkedAt, '2026-10-13T00:00:00.000Z');
-  assert.deepEqual(summary.judgeSuite, { total: 41, recorded: 0, status: '미실행' });
-  assert.deepEqual(summarizeCheckRecord(null).counts, { total: 0, blocked: 0, breached: 0, notRun: 0 });
+  assert.deepEqual(summarizeCheckRecord(null).counts, { total: 41, executed: 0, blocked: 0, breached: 0, notRun: 41 });
   assert.equal(summarizeCheckRecord(null).available, false);
 });
 
@@ -73,7 +75,8 @@ test('방금 만든 제출 묶음이 있으면 그 결과(미실행 포함)로 �
   }));
   const summary = summarizeCheckRecord(loadCheckRecord(base));
   assert.equal(summary.source, 'artifacts/submission.json');
-  assert.deepEqual(summary.counts, { total: 2, blocked: 1, breached: 0, notRun: 1 });
+  assert.deepEqual(summary.recorded, { total: 2, blocked: 1, breached: 0, notRun: 1 });
+  assert.deepEqual(summary.counts, { total: 41, executed: 1, blocked: 1, breached: 0, notRun: 40 });
 });
 
 test('제출 점검 기록과 같은 응답을 받으면 같은 결과가 나온다', async () => {
@@ -84,7 +87,8 @@ test('제출 점검 기록과 같은 응답을 받으면 같은 결과가 나온
       step: 12, publicAppUrl: 'https://student-defense.vercel.app/', originalApiUrl: 'https://db.example.org/rest/v1/notes',
     });
     const summary = summarizeCheckRecord(buildCheckRecord(attempts));
-    assert.deepEqual(summary.counts, { total: attempts.length, blocked: attempts.length, breached: 0, notRun: 0 });
+    assert.deepEqual(summary.recorded, { total: attempts.length, blocked: attempts.length, breached: 0, notRun: 0 });
+    assert.deepEqual(summary.counts, { total: 41, executed: attempts.length, blocked: attempts.length, breached: 0, notRun: 41 - attempts.length });
     for (const attempt of attempts) {
       assert.deepEqual(Object.keys(attempt).sort(), ['attackId', 'expected', 'observed', 'result', 'stage']);
       assert.equal(attempt.result, 'blocked');
@@ -94,7 +98,7 @@ test('제출 점검 기록과 같은 응답을 받으면 같은 결과가 나온
     const offline = await runAttackChecks('https://student-defense.vercel.app/');
     assert.ok(offline.every((attempt) => attempt.observed === 'not_run' && attempt.result === 'not_run'));
     assert.deepEqual(summarizeCheckRecord(buildCheckRecord(offline)).counts,
-      { total: offline.length, blocked: 0, breached: 0, notRun: offline.length });
+      { total: 41, executed: 0, blocked: 0, breached: 0, notRun: 41 });
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -102,7 +106,7 @@ test('제출 점검 기록과 같은 응답을 받으면 같은 결과가 나온
 
 test('화면은 /api/checks 응답 값만 textContent 로 표시한다', () => {
   const page = read('public/index.html');
-  for (const word of ["fetch('/api/checks'", 'checksSummaryText(checks)', 'checksSummaryText(report.checks)', '실행하지 않은 점검', '뚫린 공격']) {
+  for (const word of ["fetch('/api/checks'", 'checksSummaryText(checks)', 'checksSummaryText(report.checks)', '실행하지 않은 시험', '뚫린 공격', '41종 시험 기준']) {
     assert.ok(page.includes(word), word);
   }
   assert.equal(page.includes('innerHTML'), false);

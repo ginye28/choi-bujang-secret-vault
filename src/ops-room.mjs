@@ -311,6 +311,7 @@ export function summarizeVerification(executedRows, deployedRows = [], pending =
 export function buildOpsReport({ rows, deployedRows = [], recovery, devices, events = null, checkRecord = null, policy = buildPolicyCopy(), now = new Date() }) {
   const verdict = verifyPolicyCopy(policy);
   const verification = summarizeVerification(rows, deployedRows);
+  const checks = summarizeCheckRecord(checkRecord);
   const burstRow = rows.find((item) => item.id === 's9_burst');
   return {
     schema: 'aleph.ops.report.v1',
@@ -327,18 +328,18 @@ export function buildOpsReport({ rows, deployedRows = [], recovery, devices, eve
       policyCopy: { ok: verdict.ok, version: verdict.ok ? verdict.version : null, sha256: verdict.ok ? verdict.sha256.slice(0, 16) : null },
     },
     verification,
-    // 제출 점검 기록(docs/check-record.json)의 요약. GET /api/checks 와 같은 함수·같은 기록에서 셉니다.
-    checks: summarizeCheckRecord(checkRecord),
+    // 제출 점검 기록의 요약(41종 기준). GET /api/checks 와 같은 함수·같은 기록에서 셉니다.
+    checks,
     // 서버가 실제로 받은 요청의 기록(최근 50줄·규칙별 거부 수·결과별 건수). 위 점검 표와 별개입니다.
     events: events ?? {
       available: false, recordedTotal: 0, recent: [], denyByRule: [],
       outcomes: { blocked: 0, allowed: 0, errors: 0 },
       tagged: { checks: 0, blocked: 0, allowed: 0, errors: 0 },
     },
-    // 심판의 41종 시험 결과는 학생 환경에 기록이 없습니다. 막음·통과로 세지 않고 미실행으로만 표시합니다.
+    // 41종 시험: 실제 API 로 실행해 기록이 있는 점검만 실행으로 세고, 나머지는 미실행(막음·통과로 세지 않음).
     judgeSuite: {
-      total: TOTAL_ATTACKS, runByStudent: 0, recorded: 0, status: STATUS_NOT_RUN,
-      note: '심판의 41종 시험은 운영 측이 실행합니다. 이 화면에는 그 결과 기록이 없으므로 41종은 모두 미실행이며, 막음·통과로 세지 않습니다.',
+      total: TOTAL_ATTACKS, runByStudent: checks.counts.executed, notRun: checks.counts.notRun,
+      note: `41종 시험 중 실제 API 로 실행해 응답이 기록된 것은 ${checks.counts.executed}종뿐입니다. 나머지 ${checks.counts.notRun}종은 미실행이며 막음·통과로 세지 않습니다. 코드 시험은 실제 API 실행으로 세지 않습니다.`,
     },
   };
 }
