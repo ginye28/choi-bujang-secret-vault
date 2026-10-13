@@ -106,7 +106,7 @@ test('화면 묶음에는 기기 서명 정보를 만들거나 저장하는 코�
   for (const word of ['generateKey', 'exportKey', 'importKey', 'privateKey', 'localStorage', 'indexedDB', 'jwk']) {
     assert.equal(page.includes(word), false, word);
   }
-  // 브라우저 저장소에는 로그인 상태 외에 기기 정보를 넣지 않는다.
-  const stores = [...page.matchAll(/sessionStorage\.setItem\(([A-Z_]+)/gu)].map((match) => match[1]);
-  assert.deepEqual([...new Set(stores)].sort(), ['EMAIL_SLOT', 'TOKEN_SLOT']);
+  // 로그인 토큰을 포함해 어떤 값도 브라우저 저장소에 넣지 않는다.
+  assert.equal(page.includes('sessionStorage'), false);
+  assert.equal(page.includes('setItem'), false);
 });

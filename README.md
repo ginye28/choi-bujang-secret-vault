@@ -7,7 +7,7 @@
 - **기기 승인(서버 결정)**: `POST /api/device` `{action:'request'}` 가 서버가 만든 기기 번호를 발급하고 기록합니다. 브라우저는 번호만 메모리에 두며 어떤 기기 값도 브라우저 저장소에 넣지 않습니다. 승인 규칙은 서버가 정합니다: 이 사용자의 첫 기기이거나 로그인(토큰 발급 1시간 이내)한 요청이면 승인, 그 밖에는 승인 대기입니다. 대기 중인 기기는 승인된 기기의 서명 요청 또는 서버에 저장된 강사 권한(`action:'approve'`)으로만 승인됩니다. `GET /api/device?deviceId=` 는 소유자에게만 상태를 알려 줍니다.
 - **서버가 발급하는 요청 서명**: 화면에는 기기 서명 정보가 없습니다. 보호 요청을 보내기 전에 화면이 `POST /api/device` `{action:'ticket', deviceId, method, path, bodySha256}` 로 그 요청 하나에 대한 짧은 서명(티켓)을 받아 `X-Aleph-Device`·`X-Aleph-Ticket`(와 설치형 앱 표시 `X-Aleph-App: installed`)로 붙입니다. 서명은 서버만 아는 비밀로 사용자·기기·방식·경로·본문 해시·시각을 묶으므로(`src/device-proof.mjs`), 서명 뒤 경로·본문·방식을 바꾸면 `SIGNATURE_INVALID`, 서명이 없으면 `SIGNATURE_MISSING`(`401 DEVICE_PROOF_REQUIRED`)이고 승인 전·다른 사용자의 기기·120초가 지난 서명도 거부됩니다.
 - **서명이 필요한 요청**: 설치형 앱 표시가 붙은 요청과 학생 로그인(`kind: student`)의 `/api/notes`·`/api/announcements`·`/api/restore` 요청입니다. 표시를 떼어 내도 학생 로그인은 서명 없이 통과하지 못합니다. 심판이 발급한 시험 신원은 기존 로그인·소유자 규칙 그대로입니다(6~10단계 결과 유지).
-- **브라우저 저장소**: 로그인 상태(토큰·이메일)만 sessionStorage 에 있고 기기 번호·서명은 저장하지 않습니다. 서비스 워커도 아무것도 캐시하지 않습니다.
+- **브라우저 저장소**: 로그인 토큰을 포함해 어떤 값도 localStorage·sessionStorage·IndexedDB 에 넣지 않습니다. 토큰과 기기 번호는 이 화면의 메모리에만 있어 새로고침하면 다시 로그인합니다. 서비스 워커도 아무것도 캐시하지 않습니다.
 - **확인 순서**: `node --test test/device-proof.test.mjs`(서명·경로 변경·본문 변경·승인 전·오래된 서명), `npm run decider:test`, `node --test test/*.test.mjs`.
 - **미실행**: 배포된 `/api/device` 의 실제 승인 흐름과 브라우저 화면에서의 설치(홈 화면 추가)는 이 문서 작성 시점에 실제 기기로 확인하지 않았습니다.
 
