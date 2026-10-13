@@ -15,10 +15,15 @@ function publicApp(config) {
   return app;
 }
 
-async function requestObservation(url, options = {}) {
+async function requestObservation(url, options = {}, attackId = null) {
+  // 12단계: 서버 요청 기록과 맞춰 볼 수 있도록 요청마다 점검 이름을 헤더로 붙입니다(읽기 요청만 보냅니다).
+  const tagged = attackId === null ? {} : {
+    'x-aleph-attack-id': attackId, 'x-attack-id': attackId, 'x-request-id': attackId,
+  };
   try {
     const response = await fetch(url, {
       ...options,
+      headers: { ...(options.headers ?? {}), ...tagged },
       redirect: 'error',
       signal: AbortSignal.timeout(10000),
     });
@@ -29,7 +34,9 @@ async function requestObservation(url, options = {}) {
     } catch {
       // Record only whether the response was JSON, never its contents.
     }
-    return `HTTP ${response.status}; JSON: ${isJson ? '예' : '아니요'}`;
+    const echoed = response.headers.get('x-request-id');
+    const suffix = echoed && attackId !== null ? `; 서버 요청 ID: ${echoed.slice(0, 64)}` : '';
+    return `HTTP ${response.status}; JSON: ${isJson ? '예' : '아니요'}${suffix}`;
   } catch {
     return 'HTTP 응답 없음; JSON 여부 미확인';
   }
@@ -68,40 +75,40 @@ export async function runAttackChecks(config) {
   results.push(attackResult(
     'public_data_json_gone',
     'GET /data.json은 HTTP 404',
-    await requestObservation(new URL('/data.json', app)),
+    await requestObservation(new URL('/data.json', app), {}, 'public_data_json_gone'),
   ));
   results.push(attackResult(
     'anonymous_notes_list_rejected',
     '인증 헤더 없는 GET /api/notes는 HTTP 401 및 JSON 응답',
-    await requestObservation(new URL('/api/notes', app)),
+    await requestObservation(new URL('/api/notes', app), {}, 'anonymous_notes_list_rejected'),
   ));
   results.push(attackResult(
     'anonymous_note_item_rejected',
     '인증 헤더 없는 GET /api/notes/<자료 ID>는 HTTP 401',
-    await requestObservation(new URL('/api/notes/00000000-0000-4000-8000-000000000000', app)),
+    await requestObservation(new URL('/api/notes/00000000-0000-4000-8000-000000000000', app), {}, 'anonymous_note_item_rejected'),
   ));
   results.push(attackResult(
     'fake_token_rejected',
     '가짜 Bearer 토큰을 보낸 GET /api/notes는 HTTP 401',
     await requestObservation(new URL('/api/notes', app), {
       headers: { Authorization: 'Bearer aaaa.bbbb.cccc' },
-    }),
+    }, 'fake_token_rejected'),
   ));
 
   results.push(attackResult(
     'anonymous_restore_route_rejected',
     '인증 헤더 없는 GET /api/restore는 HTTP 401',
-    await requestObservation(new URL('/api/restore', app)),
+    await requestObservation(new URL('/api/restore', app), {}, 'anonymous_restore_route_rejected'),
   ));
   results.push(attackResult(
     'anonymous_ops_room_rejected',
     '인증 헤더 없는 GET /api/ops는 HTTP 401 및 JSON 응답',
-    await requestObservation(new URL('/api/ops', app)),
+    await requestObservation(new URL('/api/ops', app), {}, 'anonymous_ops_room_rejected'),
   ));
   results.push(attackResult(
     'installed_marker_without_login_rejected',
     '설치 표시만 붙인 로그인 없는 GET /api/notes는 HTTP 401',
-    await requestObservation(new URL('/api/notes', app), { headers: { 'x-aleph-app': 'installed' } }),
+    await requestObservation(new URL('/api/notes', app), { headers: { 'x-aleph-app': 'installed' } }, 'installed_marker_without_login_rejected'),
   ));
 
   if (!config.originalApiUrl) {
@@ -124,7 +131,7 @@ export async function runAttackChecks(config) {
     results.push(attackResult(
       'direct_original_api_denied',
       '키 없는 원본 API 요청은 자료를 반환하지 않고 HTTP 401 또는 403',
-      await requestObservation(originalApi),
+      await requestObservation(originalApi, {}, 'direct_original_api_denied'),
     ));
   }
 

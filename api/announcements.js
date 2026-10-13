@@ -1,3 +1,4 @@
+import { withEventLog } from '../src/event-log.mjs';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
@@ -46,7 +47,7 @@ function announcementFromRow(row) {
   return { id: announcementResourceId(row.id), title: row.title, body: row.content };
 }
 
-export default async function handler(request, response) {
+async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
 
   let currentServices;
@@ -123,3 +124,6 @@ export default async function handler(request, response) {
     return response.status(500).json({ error: 'ANNOUNCEMENTS_SERVICE_UNAVAILABLE' });
   }
 }
+
+// 응답을 보내기 전에 요청·결과를 서버 요청 기록에 남깁니다(12단계).
+export default withEventLog(handler);

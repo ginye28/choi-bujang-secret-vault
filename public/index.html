@@ -95,9 +95,16 @@
           <h3>복구 버전</h3>
           <p id="ops-recovery"></p>
           <ul id="ops-versions"></ul>
+          <h3>총공세</h3>
+          <p id="ops-assault"></p>
+          <h3>규칙별 거부 수</h3>
+          <ul id="ops-deny"></ul>
+          <h3>최근 사건 50줄</h3>
+          <p id="ops-events-note"></p>
+          <ul id="ops-recent"></ul>
           <h3>점검 결과</h3>
           <p id="ops-verification"></p>
-          <div id="ops-table-wrap"><table id="ops-table"><thead><tr><th>단계</th><th>시험</th><th>기대</th><th>실제</th><th>요청 ID</th><th>확인 시각</th><th>상태</th></tr></thead><tbody></tbody></table></div>
+          <div id="ops-table-wrap"><table id="ops-table"><thead><tr><th>출처</th><th>단계</th><th>시험</th><th>기대</th><th>실제</th><th>요청 ID</th><th>확인 시각</th><th>상태</th></tr></thead><tbody></tbody></table></div>
           <h3>미실행</h3>
           <ul id="ops-pending"></ul>
           <p id="ops-judge"></p>
@@ -395,11 +402,11 @@
       const rules = report.rules;
       opsText('#ops-rules', `규칙 ${rules.ruleIds.length}개: ${rules.ruleIds.join(', ')} · 이유 코드: ${rules.reasonCodes.join(', ')} · 안전 정책 ${rules.policyVersion ?? '확인 실패'}`);
       const detection = report.detection;
-      opsText('#ops-detection', `${detection.rule}: ${detection.windowMinutes}분 안에 같은 사용자 읽기 ${detection.threshold}건 초과 시 회수 제안 · 표본 점검: ${detection.sample ? `${detection.sample.status} (${detection.sample.actual})` : '없음'} · 운영 엔진 연결: ${detection.engineConnected ? '연결' : '미실행'}`);
+      opsText('#ops-detection', `${detection.rule}: ${detection.windowMinutes}분 안에 같은 사용자 읽기 ${detection.threshold}건 초과 시 회수 제안 · 표본 점검: ${detection.sample ? `${detection.sample.status} (${detection.sample.actual})` : '없음'} · 운영 엔진 연결: ${detection.engineConnected ? '연결 확인' : '미실행'}`);
       const revocation = report.revocation;
       opsText('#ops-revocation', `내 기기 ${revocation.total}대 — 승인 ${revocation.approved}, 대기 ${revocation.pending}, 기타 ${revocation.other} · 엔진의 실제 접속 회수: ${revocation.engineRevocation}`);
       const recovery = report.recovery;
-      opsText('#ops-recovery', `사본 ${recovery.versionCount}개 · 메모 ${recovery.noteCount}건 · 정책 사본 ${recovery.policyCopy.ok ? `정상 (${recovery.policyCopy.version}, ${recovery.policyCopy.sha256})` : '검증 실패'}`);
+      opsText('#ops-recovery', `메모 사본 ${recovery.versionCount}개 · 메모 ${recovery.noteCount}건 · 정책 사본 ${recovery.policyCopy.ok ? `정상 (${recovery.policyCopy.version}, ${recovery.policyCopy.sha256})` : '검증 실패'}`);
       const versions = document.querySelector('#ops-versions');
       versions.replaceChildren();
       for (const version of recovery.versions) {
@@ -407,13 +414,36 @@
         item.textContent = `${version.noteRef} · 해시 ${version.sha16} · ${version.savedAt ?? '시각 없음'}`;
         versions.append(item);
       }
+      const events = report.events;
+      const assault = events.assault;
+      opsText('#ops-assault', `총공세 막음 ${assault.blocked} / ${assault.total} · 허용된 기록 ${assault.allowed} · 서버 오류 ${assault.errors} · 미실행 ${assault.notRun} (실제 기록이 있는 점검 이름만 셉니다. 기록이 없는 시험은 미실행입니다.)`);
+      const deny = document.querySelector('#ops-deny');
+      deny.replaceChildren();
+      if (events.denyByRule.length === 0) {
+        const empty = document.createElement('li');
+        empty.textContent = '거부 기록이 아직 없습니다.';
+        deny.append(empty);
+      }
+      for (const item of events.denyByRule) {
+        const entry = document.createElement('li');
+        entry.textContent = `${item.rule}: ${item.count}건`;
+        deny.append(entry);
+      }
+      opsText('#ops-events-note', events.available ? `서버가 받은 요청 기록 ${events.recordedTotal}건 중 최근 ${events.recent.length}줄입니다. 경로의 자료 ID와 사용자 정보는 가렸습니다.` : '서버 요청 기록을 읽지 못했습니다(미실행).');
+      const recent = document.querySelector('#ops-recent');
+      recent.replaceChildren();
+      for (const item of events.recent) {
+        const entry = document.createElement('li');
+        entry.textContent = `${item.at} · ${item.method} ${item.route} → ${item.status} ${item.outcome}${item.reason ? ` (${item.reason})` : ''} · 요청 ID ${item.requestId}${item.attackId ? ` · 점검 ${item.attackId}` : ''}`;
+        recent.append(entry);
+      }
       const verification = report.verification;
       opsText('#ops-verification', `실행 ${verification.executed}건 중 일치 ${verification.matched}건, 불일치 ${verification.mismatched}건 · 미실행 ${verification.notRun}건 · 확인 ${report.generatedAt}`);
       const body = document.querySelector('#ops-table tbody');
       body.replaceChildren();
       for (const item of verification.rows) {
         const row = document.createElement('tr');
-        for (const value of [item.stage, item.scenario, item.expected, item.actual, item.requestId, item.checkedAt, item.status]) opsCell(row, value);
+        for (const value of [item.source, item.stage, item.scenario, item.expected, item.actual, item.requestId, item.checkedAt, item.status]) opsCell(row, value);
         body.append(row);
       }
       const pending = document.querySelector('#ops-pending');

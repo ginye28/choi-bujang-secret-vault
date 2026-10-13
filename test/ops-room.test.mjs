@@ -41,11 +41,11 @@ test('미실행 점검은 통과로 세지 않고 이유를 남긴다', async ()
   assert.equal(report.detection.engineConnected, false);
 });
 
-test('복구 버전 요약은 메모 ID를 가리고 제목·본문을 담지 않는다', () => {
+test('가린 복구 요약은 메모 사본만 세고 본문·전체 ID·기기 기록은 제외한다', () => {
   const id = '0b2f9d3e-6a14-4a39-8f0e-3d1c7a9b5e21';
   const summary = summarizeRecovery([
     { title: `__backup__:${id}:0123456789abcdef`, created_at: '2026-10-13T01:00:00Z', content: '비밀 본문' },
-    { title: '__backup__:device:abcdef0123456789', created_at: '2026-10-13T02:00:00Z' },
+    { title: '__backup__:device:abcdef0123456789', created_at: '2026-10-13T02:00:00Z', content: '기기 기록' },
     { title: '일반 메모 제목', created_at: '2026-10-13T03:00:00Z' },
   ]);
   assert.equal(summary.versionCount, 1);
@@ -54,7 +54,34 @@ test('복구 버전 요약은 메모 ID를 가리고 제목·본문을 담지 �
   const text = JSON.stringify(summary);
   assert.equal(text.includes(id), false);
   assert.equal(text.includes('비밀 본문'), false);
+  assert.equal(text.includes('기기 기록'), false);
   assert.equal(text.includes('일반 메모'), false);
+});
+
+test('화면 요약 수치가 실행 기록 및 미실행 목록과 일치하고 서버 기록의 추가 데이터는 제외한다', async () => {
+  const rows = await runLocalChecks();
+  const report = buildOpsReport({
+    rows,
+    deployedRows: [{
+      id: 'd1_check', stage: '2', scenario: '가상 점검', expected: 'HTTP 404', actual: 'HTTP 404',
+      requestId: 'local:check', checkedAt: '2026-10-13T01:00:00Z', status: STATUS_RAN_MATCHED,
+      content: '가상 메모 본문은 응답에 포함되면 안 됨',
+    }],
+    recovery: [{ title: '__backup__:note-identifier-123456:0123456789abcdef', created_at: '2026-10-13T01:00:00Z', content: '가상 본문 제외' }],
+    devices: [{ status: 'approved' }, { status: 'pending' }],
+  });
+  const verification = report.verification;
+  assert.equal(verification.executed, verification.rows.length);
+  assert.equal(verification.matched, verification.rows.filter((item) => item.status === STATUS_RAN_MATCHED).length);
+  assert.equal(verification.mismatched, verification.rows.length - verification.matched);
+  assert.equal(verification.notRun, verification.pending.length);
+  assert.equal(report.revocation.total, report.revocation.approved + report.revocation.pending + report.revocation.other);
+  assert.equal(report.recovery.versionCount, 1);
+  assert.equal(report.detection.sample.status, rows.find((item) => item.id === 's9_burst').status);
+  const serialized = JSON.stringify(report);
+  assert.equal(serialized.includes('가상 메모 본문'), false);
+  assert.equal(serialized.includes('가상 본문 제외'), false);
+  assert.equal(serialized.includes('note-identifier-123456'), false);
 });
 
 test('기기 상태 요약은 승인·대기·기타를 센다', () => {

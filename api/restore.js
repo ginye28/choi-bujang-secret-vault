@@ -1,3 +1,4 @@
+import { withEventLog } from '../src/event-log.mjs';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
@@ -36,7 +37,7 @@ function requestBody(request) {
 }
 
 // POST /api/restore — 비공개 가상 메모 사본에서 지정한 메모 한 건만 되돌립니다(10단계).
-export default async function handler(request, response) {
+async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
 
   let currentServices;
@@ -72,3 +73,6 @@ export default async function handler(request, response) {
   const result = await restoreNote({ supabase: currentServices.supabase, identity, body });
   return response.status(result.status).json(result.json);
 }
+
+// 응답을 보내기 전에 요청·결과를 서버 요청 기록에 남깁니다(12단계).
+export default withEventLog(handler);

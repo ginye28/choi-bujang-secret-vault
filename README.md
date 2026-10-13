@@ -10,6 +10,12 @@
 - **점검 기록**: `npm run verify:all`(코드 직접 호출)과 `node scripts/verify-all.mjs --deployed`(배포 주소에 로그인 없이 보내는 요청)가 `docs/verification-log.json` 과 `docs/VERIFICATION.md` 를 만듭니다. 항목마다 기대 결과·실제 결과·요청 ID·확인 시각·상태를 한 표에 둡니다.
 - **판정기 보강**: 엔진이 `identity_revoked`·`access_revoked`·`session_revoked`·`device_revoked` 사건을 알린 신원은 같은 요청을 다시 보내도 `device_not_registered` 로 먼저 거부합니다.
 
+### 서버 요청 기록 (작전실 수치의 근거)
+- `src/event-log.mjs` 가 `/api/notes`·`/api/announcements`·`/api/restore`·`/api/device`·`/api/ops` 의 모든 요청을 응답을 보내기 전에 기록합니다. 기록 한 건은 요청 ID(응답 헤더 `X-Request-Id` 로도 돌려줌), 시각, 방식, 가린 경로(`/api/notes/:id`), 응답 상태, 이유 코드, 점검 이름(`x-aleph-attack-id` 헤더가 있을 때), 행위자 종류와 짧은 가명 값뿐입니다. 토큰·이메일·메모 제목·본문·전체 자료 ID는 남기지 않습니다.
+- 작전실의 **최근 사건 50줄**, **규칙별 거부 수**, **총공세 막음 n / 41** 은 이 기록에서만 계산합니다. 기록이 있는 점검 이름만 막음·허용으로 세고 41 중 나머지는 **미실행**입니다. 41종을 모두 막았다고 적지 않습니다.
+- 로그인 사용자의 기록은 본인에게만 보이고, 로그인 없는 요청과 거부된 요청의 기록은 가려진 형태로 모두에게 보입니다. 오래된 기록은 자동으로 지워 최근 수백 건만 유지합니다.
+- `npm run bundle` 의 자체 점검(`src/attack-check.mjs`)은 읽기(GET) 요청만 보내며 요청마다 점검 이름을 `x-aleph-attack-id` 로 붙이고, 서버가 돌려준 요청 ID를 `observed` 에 적습니다. 보내지 않은 점검은 `not_run` 으로 둡니다.
+
 ### 실행·미실행 구분
 - **실행·일치 / 실행·불일치**: 위 점검이 실제로 호출해서 얻은 결과입니다. 요청 ID는 판정 요청의 UUID, 배포 요청의 `x-vercel-id`, 또는 `local:` 표시입니다.
 - **미실행**: 로그인 토큰이 필요한 배포 API 호출, 운영 자료를 바꾸는 `POST /api/restore` 실호출, 운영 엔진의 사건 전달·접속 회수, 실제 기기 설치는 이 환경에서 실행하지 않았습니다. 표의 "미실행" 목록에 이유와 함께 남겼고 통과로 세지 않습니다.

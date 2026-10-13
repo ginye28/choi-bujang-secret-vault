@@ -1,9 +1,11 @@
+import { withEventLog } from '../src/event-log.mjs';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { checkDeviceProof, createDeviceStore } from '../src/device-proof.mjs';
 import { BACKUP_PREFIX } from '../src/note-backup.mjs';
 import { buildOpsReport, runLocalChecks } from '../src/ops-room.mjs';
+import { actorRef, readEvents, summarizeEvents } from '../src/event-log.mjs';
 
 let services;
 
@@ -38,7 +40,7 @@ function readDeployedRows() {
 
 // GET /api/ops — 탈환 작전실 요약(12단계). 로그인한 사용자 본인의 복구 버전·기기 상태 숫자와
 // 서버가 지금 실행한 점검 결과만 돌려줍니다. 메모 제목·본문은 읽지도 돌려주지도 않습니다.
-export default async function handler(request, response) {
+async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
 
   let currentServices;
@@ -80,10 +82,19 @@ export default async function handler(request, response) {
     if (error || !Array.isArray(data)) throw error ?? new Error('recovery_lookup_failed');
     const devices = await store.listOwned(identity.userId);
     const rows = await runLocalChecks();
+    let events;
+    try {
+      events = { ...summarizeEvents(await readEvents(currentServices.supabase), actorRef(identity.userId)), available: true };
+    } catch {
+      events = { ...summarizeEvents([]), available: false };
+    }
     return response.status(200).json(buildOpsReport({
-      rows, deployedRows: readDeployedRows(), recovery: data, devices,
+      rows, deployedRows: readDeployedRows(), recovery: data, devices, events,
     }));
   } catch {
     return response.status(500).json({ error: 'OPS_SERVICE_UNAVAILABLE' });
   }
 }
+
+// 응답을 보내기 전에 요청·결과를 서버 요청 기록에 남깁니다(12단계).
+export default withEventLog(handler);

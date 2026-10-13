@@ -1,3 +1,4 @@
+import { withEventLog } from '../src/event-log.mjs';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
@@ -46,7 +47,7 @@ function summary(record) {
 // 기기 번호와 서명은 서버가 만들고, 브라우저에는 기기 서명 정보가 없습니다. 승인 여부도 서버가 정합니다:
 // 이 사용자의 첫 기기이거나 로그인한 지 얼마 안 된 요청이면 승인하고, 그 밖에는 승인된 기기의 서명
 // 요청 또는 서버에 저장된 강사 권한(action: 'approve')이 있어야 승인됩니다. 화면의 버튼 값은 쓰지 않습니다.
-export default async function handler(request, response) {
+async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
 
   let currentServices;
@@ -150,3 +151,6 @@ export default async function handler(request, response) {
     return response.status(500).json({ error: 'DEVICE_SERVICE_UNAVAILABLE' });
   }
 }
+
+// 응답을 보내기 전에 요청·결과를 서버 요청 기록에 남깁니다(12단계).
+export default withEventLog(handler);

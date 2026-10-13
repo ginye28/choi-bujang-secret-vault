@@ -1,0 +1,111 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+import {
+  actorRef, attackTagOf, buildEvent, maskedRoute, outcomeOf, requestIdOf, summarizeEvents, TOTAL_ATTACKS,
+  withEventLog,
+} from '../src/event-log.mjs';
+import { buildOpsReport, runLocalChecks } from '../src/ops-room.mjs';
+
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+function jwtFor(sub) {
+  const part = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return `${part({ alg: 'none' })}.${part({ sub })}.${'a'.repeat(20)}`;
+}
+
+test('점검 이름과 요청 ID 는 안전한 형식만 받는다', () => {
+  assert.equal(attackTagOf({ 'x-aleph-attack-id': 'Anonymous_Notes_List_Rejected' }), 'anonymous_notes_list_rejected');
+  assert.equal(attackTagOf({ 'x-attack-id': 'ok.id-1' }), 'ok.id-1');
+  assert.equal(attackTagOf({ 'x-attack-id': '../etc/passwd' }), null);
+  assert.equal(attackTagOf({}), null);
+  assert.equal(requestIdOf({ 'x-request-id': 'my_check' }), 'my_check');
+  assert.match(requestIdOf({ 'x-request-id': 'bad id!' }), /^[0-9a-f-]{36}$/u);
+});
+
+test('경로의 자료 ID 는 가려서 기록한다', () => {
+  assert.equal(maskedRoute({ url: '/api/notes/0b2f9d3e-6a14-4a39-8f0e-3d1c7a9b5e21' }), '/api/notes/:id');
+  assert.equal(maskedRoute({ url: '/api/notes?id=abc', query: { id: 'abc' } }), '/api/notes/:id');
+  assert.equal(maskedRoute({ url: '/api/notes' }), '/api/notes');
+  assert.equal(maskedRoute({ url: '/api/ops?x=1' }), '/api/ops');
+});
+
+test('기록에는 토큰·이메일·본문 없이 가린 값만 남는다', () => {
+  const token = jwtFor('11111111-2222-3333-4444-555555555555');
+  const event = buildEvent({
+    request: {
+      method: 'put', url: '/api/notes/secret-note-id', headers: { authorization: `Bearer ${token}`, 'x-attack-id': 'probe_one' },
+      body: { title: '비밀 제목', body: '비밀 본문' },
+    },
+    status: 403, body: { error: 'FORBIDDEN', message: '메모 본문 abc' }, requestId: 'req-1',
+    now: new Date('2026-10-13T00:00:00Z'),
+  });
+  assert.deepEqual(event.actor, { kind: 'authenticated', ref: actorRef('11111111-2222-3333-4444-555555555555') });
+  assert.equal(event.outcome, 'blocked');
+  assert.equal(event.reason, 'FORBIDDEN');
+  assert.equal(event.attackId, 'probe_one');
+  assert.equal(event.route, '/api/notes/:id');
+  const text = JSON.stringify(event);
+  for (const secret of [token, '비밀', 'secret-note-id', '11111111-2222']) assert.equal(text.includes(secret), false, secret);
+  assert.equal(outcomeOf(200), 'allowed');
+  assert.equal(outcomeOf(401), 'blocked');
+  assert.equal(outcomeOf(500), 'error');
+});
+
+test('요약: 최근 50줄, 규칙별 거부 수, 막음 n / 41 과 미실행을 실제 기록으로만 센다', () => {
+  const make = (index, extra) => ({
+    v: 1, requestId: `r${index}`, at: `2026-10-13T00:${String(index % 60).padStart(2, '0')}:00Z`, method: 'GET',
+    route: '/api/notes', status: 401, outcome: 'blocked', reason: 'LOGIN_REQUIRED', attackId: null,
+    actor: { kind: 'anonymous', ref: null }, ...extra,
+  });
+  const events = [];
+  for (let index = 0; index < 60; index += 1) events.push(make(index));
+  events.push(make(100, { attackId: 'a_one' }), make(101, { attackId: 'a_one' }), make(102, { attackId: 'a_two' }));
+  events.push(make(103, { attackId: 'a_three', status: 200, outcome: 'allowed', reason: null, actor: { kind: 'authenticated', ref: 'me000000' } }));
+  events.push(make(104, { attackId: 'a_other', status: 200, outcome: 'allowed', reason: null, actor: { kind: 'authenticated', ref: 'someoneelse' } }));
+  const summary = summarizeEvents(events, 'me000000');
+  assert.equal(summary.recent.length, 50);
+  assert.equal(summary.assault.total, TOTAL_ATTACKS);
+  assert.equal(summary.assault.blocked, 2);
+  assert.equal(summary.assault.allowed, 1);
+  assert.equal(summary.assault.notRun, TOTAL_ATTACKS - 3);
+  assert.deepEqual(summary.denyByRule[0], { rule: 'LOGIN_REQUIRED', count: 63 });
+  // 다른 사용자의 로그인 기록은 보이지 않는다.
+  assert.equal(summary.recordedTotal, events.length - 1);
+  assert.equal(JSON.stringify(summary).includes('someoneelse'), false);
+  assert.equal(summarizeEvents([], null).assault.notRun, TOTAL_ATTACKS);
+});
+
+test('감싼 핸들러는 응답을 보내기 전에 기록을 남기고 요청 ID 를 돌려준다', async () => {
+  const sent = [];
+  const headers = {};
+  const response = {
+    setHeader: (name, value) => { headers[name] = value; },
+    status(code) { sent.push(['status', code]); return this; },
+    json(body) { sent.push(['json', body]); return this; },
+  };
+  const handler = async (_request, res) => res.status(401).json({ error: 'UNAUTHORIZED', reason: 'LOGIN_REQUIRED' });
+  const wrapped = withEventLog(handler);
+  await wrapped({ method: 'GET', url: '/api/notes', headers: { 'x-request-id': 'probe_two' } }, response);
+  assert.equal(headers['X-Request-Id'], 'probe_two');
+  assert.deepEqual(sent, [['status', 401], ['json', { error: 'UNAUTHORIZED', reason: 'LOGIN_REQUIRED' }]]);
+});
+
+test('작전실 보고서에 서버 요청 기록 요약이 들어가고 화면이 그대로 보여 준다', async () => {
+  const rows = await runLocalChecks();
+  const events = { ...summarizeEvents([], null), available: true };
+  const report = buildOpsReport({ rows, recovery: [], devices: [], events });
+  assert.equal(report.events.assault.total, 41);
+  assert.equal(report.events.assault.notRun, 41);
+  const page = read('public/index.html');
+  for (const label of ['최근 사건 50줄', '규칙별 거부 수', '총공세 막음']) assert.ok(page.includes(label), label);
+  for (const name of ['notes', 'announcements', 'restore', 'device', 'ops']) {
+    assert.ok(read(`api/${name}.js`).includes('withEventLog(handler)'), name);
+  }
+});
+
+test('제출 묶음 점검은 읽기 요청만 보내고 점검 이름을 붙인다', () => {
+  const source = read('src/attack-check.mjs');
+  assert.equal(/method:\s*'(?:POST|PUT|PATCH|DELETE)'/u.test(source), false);
+  assert.ok(source.includes("'x-aleph-attack-id': attackId"));
+});

@@ -19,7 +19,8 @@ async function probe(app, spec) {
   try {
     const target = spec.absolute ? new URL(spec.path) : new URL(spec.path, app);
     const response = await fetch(target, {
-      method: spec.method, headers: spec.headers, redirect: 'manual', signal: AbortSignal.timeout(10000),
+      method: spec.method, redirect: 'manual', signal: AbortSignal.timeout(10000),
+      headers: { ...(spec.headers ?? {}), ...(spec.absolute ? {} : { 'x-aleph-attack-id': spec.id, 'x-request-id': spec.id }) },
     });
     requestId = response.headers.get('x-vercel-id') ?? response.headers.get('x-request-id') ?? '헤더 없음';
     actual = `HTTP ${response.status}`;

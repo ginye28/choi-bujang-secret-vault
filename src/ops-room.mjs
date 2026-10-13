@@ -92,7 +92,6 @@ export async function runLocalChecks({ now = new Date() } = {}) {
   const rows = [];
   const add = (...args) => rows.push(row(...args, now));
   const note = `/notes/${NOTE_ID}`;
-  const noteRoute = 'GET /notes/:id';
 
   // 6단계: 등록 기기와 미등록 기기
   let out = await decideObserved(engineRequest('GET', note));
@@ -222,9 +221,13 @@ const BACKUP_TITLE = /^__backup__:([0-9A-Za-z-]{8,64}):([0-9a-f]{16})$/u;
 // 사본 행(제목과 저장 시각만)에서 복구 버전 요약을 만듭니다. 메모 제목·본문은 받지 않습니다.
 export function summarizeRecovery(rows) {
   const versions = [];
-  for (const item of Array.isArray(rows) ? rows : []) {
+  const noteIds = new Set();
+  const records = Array.isArray(rows) ? rows : [];
+  for (const item of records) {
     const match = BACKUP_TITLE.exec(typeof item?.title === 'string' ? item.title : '');
-    if (!match) continue;
+    // 기기 상태도 같은 비공개 접두사를 쓰지만 메모 복구 버전은 아닙니다.
+    if (!match || match[1].toLowerCase() === 'device') continue;
+    noteIds.add(match[1]);
     versions.push({
       noteRef: `${match[1].slice(0, NOTE_REF_LENGTH)}…`, sha16: match[2],
       savedAt: typeof item.created_at === 'string' ? item.created_at : null,
@@ -233,7 +236,8 @@ export function summarizeRecovery(rows) {
   versions.sort((a, b) => String(a.savedAt).localeCompare(String(b.savedAt)));
   return {
     versionCount: versions.length,
-    noteCount: new Set(versions.map((version) => version.noteRef)).size,
+    // 중복 가림 표기(앞 8자)가 있더라도 원본 ID 기준으로 메모 수를 셉니다.
+    noteCount: noteIds.size,
     versions: versions.slice(-20),
   };
 }
@@ -248,8 +252,32 @@ export function summarizeDevices(records) {
   return { ...counts, total: counts.approved + counts.pending + counts.other };
 }
 
+function safeReportRow(item, source) {
+  const text = (value, maxLength) => typeof value === 'string'
+    ? value.slice(0, maxLength).replace(/[\u0000-\u001f\u007f]/gu, ' ')
+    : '';
+  const id = typeof item?.id === 'string' && /^[a-z0-9_]{1,64}$/u.test(item.id) ? item.id : 'redacted';
+  const status = item?.status === STATUS_RAN_MATCHED ? STATUS_RAN_MATCHED : STATUS_RAN_MISMATCHED;
+  return {
+    id,
+    source,
+    stage: text(item?.stage, 16),
+    scenario: text(item?.scenario, 240),
+    expected: text(item?.expected, 240),
+    actual: text(item?.actual, 240),
+    requestId: text(item?.requestId, 160),
+    checkedAt: text(item?.checkedAt, 40),
+    status,
+  };
+}
+
 export function summarizeVerification(executedRows, deployedRows = [], pending = PENDING_CHECKS) {
-  const rows = [...executedRows, ...deployedRows];
+  // 기록은 화면에 필요한 열만 반환합니다. 서버 기록에 본문 등 추가 필드가 있어도 응답에 복사하지 않습니다.
+  // 출처도 분리해 코드 직접 호출 결과를 실제 배포 API 응답으로 오인하지 않게 합니다.
+  const rows = [
+    ...executedRows.map((item) => safeReportRow(item, '코드 직접 호출')),
+    ...deployedRows.map((item) => safeReportRow(item, '배포 API 응답')),
+  ];
   const matched = rows.filter((item) => item.status === STATUS_RAN_MATCHED).length;
   return {
     executed: rows.length, matched, mismatched: rows.length - matched, notRun: pending.length,
@@ -259,7 +287,7 @@ export function summarizeVerification(executedRows, deployedRows = [], pending =
 }
 
 // 화면이 그대로 보여 줄 요약. 화면의 수치는 모두 이 객체의 값입니다.
-export function buildOpsReport({ rows, deployedRows = [], recovery, devices, policy = buildPolicyCopy(), now = new Date() }) {
+export function buildOpsReport({ rows, deployedRows = [], recovery, devices, events = null, policy = buildPolicyCopy(), now = new Date() }) {
   const verdict = verifyPolicyCopy(policy);
   const verification = summarizeVerification(rows, deployedRows);
   const burstRow = rows.find((item) => item.id === 's9_burst');
@@ -278,6 +306,11 @@ export function buildOpsReport({ rows, deployedRows = [], recovery, devices, pol
       policyCopy: { ok: verdict.ok, version: verdict.ok ? verdict.version : null, sha256: verdict.ok ? verdict.sha256.slice(0, 16) : null },
     },
     verification,
+    // 서버가 실제로 받은 요청의 기록(최근 50줄·규칙별 거부 수·총공세 막음 n / 41). 위 점검 표와 별개입니다.
+    events: events ?? {
+      available: false, recordedTotal: 0, recent: [], denyByRule: [],
+      assault: { total: 41, blocked: 0, allowed: 0, errors: 0, notRun: 41 },
+    },
     judgeSuite: {
       total: 41, runByStudent: 0,
       note: '심판의 41종 시험은 운영 측이 실행합니다. 이 표의 점검은 학생이 직접 실행한 것만 세며, 41종의 통과를 대신하지 않습니다.',
