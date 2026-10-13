@@ -101,7 +101,7 @@ test('재작성된 주소는 같은 경로로 맞추고, 새 기기 승인은 �
   assert.equal(decideNewDevice({ approvedCount: 2, loginAgeSeconds: Number.NaN }).status, 'pending');
 });
 
-test('화면 묶음에는 기기 키를 만들거나 저장하는 코드가 없다', async () => {
+test('화면 묶음에는 기기 서명 정보를 만들거나 저장하는 코드가 없다', async () => {
   const page = await readFile(join(root, 'public', 'index.html'), 'utf8');
   for (const word of ['generateKey', 'exportKey', 'importKey', 'privateKey', 'localStorage', 'indexedDB', 'jwk']) {
     assert.equal(page.includes(word), false, word);

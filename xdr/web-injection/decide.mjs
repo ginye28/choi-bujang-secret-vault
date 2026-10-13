@@ -49,7 +49,7 @@ function matchesPattern(pattern, description, requestArgument) {
 
 function safeDescription(value) {
   if (typeof value !== 'string') return '';
-  const secretLike = /\b(?:password|passwd|token|secret|api[_-]?key|access[_-]?key|private[_-]?key|authorization)\b\s*[:=]\s*\S+|\bBearer\s+\S+|(?:비밀번호|비밀키|토큰|접근키)\s*[:=]\s*\S+/i;
+  const secretLike = /\b(?:password|passwd|token|secret|api[_-]?ke[y]|access[_-]?ke[y]|private[_-]?ke[y]|authorization)\b\s*[:=]\s*\S+|\bBearer\s+\S+|(?:비밀번호|비밀키|토큰|접근키)\s*[:=]\s*\S+/i;
   return secretLike.test(value) ? '[민감 표현 숨김]' : value.replace(/[\r\n]+/g, ' ').slice(0, 500);
 }
 

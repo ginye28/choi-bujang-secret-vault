@@ -47,10 +47,10 @@ export async function readAlerts(path = FIXTURE) {
   }
 
   // 무작위 키는 요청 범위 안에서만 사용하며 디스크나 결과 객체에 쓰지 않습니다.
-  const userKey = randomBytes(32);
-  const deviceKey = randomBytes(32);
-  const pseudonymizeUser = aliasFor('user', userKey);
-  const pseudonymizeDevice = aliasFor('device', deviceKey);
+  const userSalt = randomBytes(32);
+  const deviceSalt = randomBytes(32);
+  const pseudonymizeUser = aliasFor('user', userSalt);
+  const pseudonymizeDevice = aliasFor('device', deviceSalt);
   return fixture.alerts.map((alert) => safeRow(alert, pseudonymizeUser, pseudonymizeDevice));
 }
 
