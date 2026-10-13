@@ -1,8 +1,8 @@
 {
   "schema": "aleph.verification.log.v1",
-  "generatedAt": "2026-10-13T05:35:16.186Z",
+  "generatedAt": "2026-10-13T05:35:54.151Z",
   "note": "학생이 직접 실행한 점검만 담았습니다. 심판의 41종 시험 결과가 아니며, 미실행 항목은 통과로 세지 않습니다.",
-  "deployedAt": null,
+  "deployedAt": "https://choi-bujang-secret-vault-nine-chi.vercel.app/",
   "localRows": [
     {
       "id": "s6_registered_read",
@@ -10,8 +10,8 @@
       "scenario": "등록된 기기의 자기 메모 읽기",
       "expected": "allow / approved",
       "actual": "allow / approved",
-      "requestId": "dd7cc659-5337-4473-a036-ec85adbc3cb7",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "4492d1ba-bdbb-4ef2-aaa6-718afe9068dc",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -20,8 +20,8 @@
       "scenario": "미등록 기기의 메모 읽기",
       "expected": "deny / device_not_registered",
       "actual": "deny / device_not_registered",
-      "requestId": "641e3d40-181d-41e4-99a3-8a998bea52be",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "83ddf45d-5e2c-4eef-a35a-74a4b9282d3a",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -30,8 +30,8 @@
       "scenario": "새 네트워크·읽기 급증·재인증 없음",
       "expected": "step_up / step_up_required",
       "actual": "step_up / step_up_required",
-      "requestId": "292dd1f0-5157-4aea-beaf-3fad8424323a",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "fd7e24e9-28d6-4796-8f91-e237d89c00af",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -40,8 +40,8 @@
       "scenario": "같은 요청, 재인증 확인 완료",
       "expected": "allow / approved",
       "actual": "allow / approved",
-      "requestId": "969a7e22-15c2-4bde-82e6-7e4fd4bdaa10",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "f40b3eb7-cc67-4876-907d-ba7214c3c212",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -50,8 +50,8 @@
       "scenario": "다른 주체의 메모 읽기",
       "expected": "deny / zone_other_owner",
       "actual": "deny / zone_other_owner",
-      "requestId": "3811bd84-885f-4c04-b6b5-a213989c158e",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "df8de1b5-ac90-4553-a8e7-b1941e1d4a4d",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -60,8 +60,8 @@
       "scenario": "메모 수정(PUT)",
       "expected": "deny / route_not_allowed",
       "actual": "deny / route_not_allowed",
-      "requestId": "430bef35-9304-4d5a-9933-4bbe3f190258",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "bef6c318-483d-4970-a13a-611ef6340388",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -70,8 +70,8 @@
       "scenario": "공지 등록(POST)",
       "expected": "deny / announcement_write_denied",
       "actual": "deny / announcement_write_denied",
-      "requestId": "ff911ed7-e71e-4324-b2b7-166512407109",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "2bc6ed13-8a2b-4be5-a55a-bf36e9e13d09",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -80,8 +80,8 @@
       "scenario": "자료 경로에 쿼리를 붙인 읽기",
       "expected": "deny / query_not_allowed",
       "actual": "deny / query_not_allowed",
-      "requestId": "9bf881ae-fec6-4696-b6c6-98fe4bd7fab5",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "5585c233-8adb-442d-b911-83e183e4ca3b",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -90,8 +90,8 @@
       "scenario": "10분 안에 같은 사용자 GET 121건",
       "expected": "propose_revocation / burst_read",
       "actual": "propose_revocation / burst_read",
-      "requestId": "local:153a7f9e-6ca5-4978-961e-d0b99d38e92d",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "local:b9304a34-7c0f-4100-9b3c-d11791ded082",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -100,8 +100,8 @@
       "scenario": "10분 안에 같은 사용자 GET 120건(경계)",
       "expected": "observe",
       "actual": "observe",
-      "requestId": "local:d4f41fbf-7ed5-49be-82a2-c0b9cf3a134a",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "local:5b90d0da-3b8d-444b-aab0-dd2c45e640be",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -110,8 +110,8 @@
       "scenario": "내용이 바뀐 정책 사본 검증",
       "expected": "ok=false / COPY_HASH_MISMATCH",
       "actual": "ok=false / COPY_HASH_MISMATCH",
-      "requestId": "local:6052a72b-0c37-4b13-94bd-2362612dece8",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "local:a9b50027-b453-490c-b264-baf980d0f9ef",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -120,8 +120,8 @@
       "scenario": "넓어진 시험 정책과 안전 사본의 차이 보기",
       "expected": "ok=true, 차이 1건 이상, 변경 없음",
       "actual": "ok=true, 차이 1건",
-      "requestId": "local:df2abbf4-9af6-4cc6-904b-3fc8024c3095",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "local:477078de-132f-46d6-a0e4-10a4fe0f8d8d",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -130,8 +130,8 @@
       "scenario": "서명 없는 학생 수정 요청",
       "expected": "required / ok=false / SIGNATURE_MISSING",
       "actual": "required=true / ok=false / SIGNATURE_MISSING",
-      "requestId": "local:c5008399-a5e2-4661-b13e-cb73793b0142",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "local:aa3e5da2-2c96-4878-9827-5611b25a6ee2",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -140,8 +140,8 @@
       "scenario": "승인된 기기가 요청마다 받은 서명으로 수정",
       "expected": "ok=true",
       "actual": "ok=true",
-      "requestId": "local:2a5e8ee7-7079-437f-8533-0136c2ec02d1",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "local:e47a2a04-923f-418a-897a-f3c9e6b9acfe",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -150,8 +150,8 @@
       "scenario": "받은 서명을 다른 자료 경로에 재사용",
       "expected": "ok=false / SIGNATURE_INVALID",
       "actual": "ok=false / SIGNATURE_INVALID",
-      "requestId": "local:c49314e0-1cdf-42b3-a72c-1abcb682a929",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "local:cdd7dd1f-c8b9-42e7-bf09-a1dafcc981a9",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -160,8 +160,8 @@
       "scenario": "승인 대기 기기의 요청",
       "expected": "ok=false / DEVICE_NOT_APPROVED",
       "actual": "ok=false / DEVICE_NOT_APPROVED",
-      "requestId": "local:1ef0ca74-053b-4336-aaf3-6dfdefc40482",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "local:72f4979f-bd97-4dc3-8b00-e44e1dc409e7",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -170,8 +170,8 @@
       "scenario": "같은 제출본: 자기 메모 조회 뒤 다른 사용자 메모 조회",
       "expected": "1번 allow / 2번 deny(zone_other_owner)",
       "actual": "allow / deny(zone_other_owner)",
-      "requestId": "e2653aa0-1370-464f-9b82-08fa264d94aa",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "216241e8-83d7-4c4f-970c-cc7439bd1e39",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -180,8 +180,8 @@
       "scenario": "미등록 기기 요청 뒤 회수된 신원의 재전송",
       "expected": "둘 다 deny / device_not_registered",
       "actual": "deny(device_not_registered) / deny(device_not_registered)",
-      "requestId": "c4fa8e6e-c97d-4535-a127-aaf8ab8684fa",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "6644a0c5-c74e-4a9e-b05c-2c868fc39085",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     },
     {
@@ -190,12 +190,133 @@
       "scenario": "복구 뒤 서명 없는 변경 요청과 구역 밖 조회",
       "expected": "변경 SIGNATURE_MISSING / 조회 deny",
       "actual": "SIGNATURE_MISSING / deny(route_not_allowed)",
-      "requestId": "b3307e91-aaec-4264-9281-2d8dbbcfc809",
-      "checkedAt": "2026-10-13T05:35:16.180Z",
+      "requestId": "adf00b14-e9bf-4df9-ba6d-70f45225b591",
+      "checkedAt": "2026-10-13T05:35:48.699Z",
       "status": "실행·일치"
     }
   ],
-  "deployedRows": [],
+  "deployedRows": [
+    {
+      "id": "d2_data_json",
+      "stage": "2",
+      "scenario": "공개 /data.json 직접 요청",
+      "expected": "HTTP 404",
+      "actual": "HTTP 404",
+      "requestId": "icn1::p9k2d-1791869738849-4c8cdd064232",
+      "checkedAt": "2026-10-13T05:35:48.705Z",
+      "status": "실행·일치"
+    },
+    {
+      "id": "d3_notes_list",
+      "stage": "3",
+      "scenario": "로그인 없는 GET /api/notes",
+      "expected": "HTTP 401",
+      "actual": "HTTP 401",
+      "requestId": "icn1::iad1::tjrvz-1791869739108-63e65fa928ea",
+      "checkedAt": "2026-10-13T05:35:50.129Z",
+      "status": "실행·일치"
+    },
+    {
+      "id": "d3_notes_post",
+      "stage": "3",
+      "scenario": "로그인 없는 POST /api/notes",
+      "expected": "HTTP 401",
+      "actual": "HTTP 401",
+      "requestId": "icn1::iad1::w7xxd-1791869739613-f1dc3ca2043c",
+      "checkedAt": "2026-10-13T05:35:50.658Z",
+      "status": "실행·일치"
+    },
+    {
+      "id": "d4_fake_token",
+      "stage": "4",
+      "scenario": "가짜 Bearer 토큰 GET /api/notes",
+      "expected": "HTTP 401",
+      "actual": "HTTP 401",
+      "requestId": "icn1::iad1::2sqsz-1791869740058-8712f7301251",
+      "checkedAt": "2026-10-13T05:35:51.093Z",
+      "status": "실행·일치"
+    },
+    {
+      "id": "d5_note_item",
+      "stage": "5",
+      "scenario": "로그인 없는 메모 상세 조회",
+      "expected": "HTTP 401",
+      "actual": "HTTP 401",
+      "requestId": "icn1::iad1::vvhhn-1791869740275-9ca0c5c77c8d",
+      "checkedAt": "2026-10-13T05:35:51.314Z",
+      "status": "실행·일치"
+    },
+    {
+      "id": "d5_note_put",
+      "stage": "5",
+      "scenario": "로그인 없는 메모 수정",
+      "expected": "HTTP 401",
+      "actual": "HTTP 401",
+      "requestId": "icn1::iad1::f5s2x-1791869740500-b62f65c223b4",
+      "checkedAt": "2026-10-13T05:35:51.536Z",
+      "status": "실행·일치"
+    },
+    {
+      "id": "d5_original_api",
+      "stage": "5",
+      "scenario": "키 없는 원본 API 직접 요청",
+      "expected": "HTTP 401 또는 HTTP 403",
+      "actual": "HTTP 401",
+      "requestId": "헤더 없음",
+      "checkedAt": "2026-10-13T05:35:51.752Z",
+      "status": "실행·일치"
+    },
+    {
+      "id": "d8_announcement_post",
+      "stage": "8",
+      "scenario": "로그인 없는 공지 등록",
+      "expected": "HTTP 401 또는 HTTP 403",
+      "actual": "HTTP 401",
+      "requestId": "icn1::iad1::62ch5-1791869741705-64833a95c836",
+      "checkedAt": "2026-10-13T05:35:52.746Z",
+      "status": "실행·일치"
+    },
+    {
+      "id": "d10_restore",
+      "stage": "10",
+      "scenario": "로그인 없는 POST /api/restore",
+      "expected": "HTTP 401",
+      "actual": "HTTP 401",
+      "requestId": "icn1::iad1::kqqjs-1791869742003-ac35e8caf51b",
+      "checkedAt": "2026-10-13T05:35:53.037Z",
+      "status": "실행·일치"
+    },
+    {
+      "id": "d11_device",
+      "stage": "11",
+      "scenario": "로그인 없는 GET /api/device",
+      "expected": "HTTP 401",
+      "actual": "HTTP 401",
+      "requestId": "icn1::iad1::tjrvz-1791869742313-36dc3f225548",
+      "checkedAt": "2026-10-13T05:35:53.353Z",
+      "status": "실행·일치"
+    },
+    {
+      "id": "d11_installed_marker",
+      "stage": "11",
+      "scenario": "설치 표시만 붙인 로그인 없는 요청",
+      "expected": "HTTP 401",
+      "actual": "HTTP 401",
+      "requestId": "icn1::iad1::2sqsz-1791869742610-44bcc73afeb1",
+      "checkedAt": "2026-10-13T05:35:53.643Z",
+      "status": "실행·일치"
+    },
+    {
+      "id": "d12_ops",
+      "stage": "12",
+      "scenario": "로그인 없는 GET /api/ops",
+      "expected": "HTTP 401",
+      "actual": "HTTP 401",
+      "requestId": "icn1::iad1::2sqsz-1791869742829-d6356a048b0d",
+      "checkedAt": "2026-10-13T05:35:53.864Z",
+      "status": "실행·일치"
+    }
+  ],
   "pending": [
     {
       "id": "deployed_authenticated_notes",
