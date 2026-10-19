@@ -39,6 +39,9 @@ test('오류는 코드와 메시지를 글자로 보이고 원인별로 다른 �
     ['CLASS_QUOTA_EXCEEDED', '사용량·한도'], ['OUTSIDE_HOURS', '이용 시간'], ['RATE_LIMITED', '요청 제한·시간 초과·네트워크'],
     ['REQUEST_TIMEOUT', '요청 제한·시간 초과·네트워크'], ['NETWORK_ERROR', '요청 제한·시간 초과·네트워크'],
     ['REQUEST_CANCELLED', '취소'], ['NO_MODELS_ALLOWED', '쓸 수 있는 모델 없음'],
+    ['WB_CLCO_LIMIT_REACHED', '사용량·한도'], ['WB_CLCO_COHORT_BUDGET_EXHAUSTED', '사용량·한도'], ['WB_CLCO_SESSION_CLOSED', '이용 시간'],
+    ['WB_CLCO_ACCESS_BLOCKED', '접근 제한'], ['WB_CLCO_AUTH_REQUIRED', '인증'], ['ON_AI_PROVISIONING_PENDING', '권한 준비 중'],
+    ['AI_MODEL_LIST_EMPTY', '쓸 수 있는 모델 없음'], ['AI_AUTHORIZATION_CHANGED', '권한 변경'], ['WB_CLCO_SERVER_UNAVAILABLE', '요청 제한·시간 초과·네트워크'],
   ];
   const seen = new Set();
   for (const [code, title] of cases) {
@@ -46,7 +49,7 @@ test('오류는 코드와 메시지를 글자로 보이고 원인별로 다른 �
     assert.ok(t.includes(code) && t.includes('안전한 안내 문장') && t.includes(title), `${code} → ${title}`);
     seen.add(t.match(/AI 연결 점검 실패: ([^\n]+?)오류 코드/u)?.[1] ?? t);
   }
-  assert.ok(seen.size >= 7);
+  assert.ok(seen.size >= 8);
   assert.ok(text(ai({ status: 'error', error: { code: 'WHAT', message: 'x' } })).includes('확인 불가'));
 });
 

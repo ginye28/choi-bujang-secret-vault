@@ -500,11 +500,12 @@ const AI_AUDIENCE_LABELS = Object.freeze({ test: '시험 연결 점검(test)', v
 // 오류 코드를 원인별 안내로 나눕니다. 먼저 맞는 항목이 이깁니다(예: RATE_LIMIT 는 한도가 아니라 요청 제한).
 const AI_ERROR_GUIDES = Object.freeze([
   { key: 'cancelled', pattern: /CANCEL|ABORT/iu, title: '취소', guide: '취소되었습니다. 이전 점검 결과는 현재 결과가 아닙니다. 필요하면 직접 다시 점검하세요.' },
-  { key: 'rate-timeout-network', pattern: /RATE|TOO_MANY|429|TIMEOUT|TIMED?_?OUT|NETWORK|OFFLINE|FETCH|ECONN|UNREACHABLE/iu, title: '요청 제한·시간 초과·네트워크', guide: '잠시 뒤에 직접 다시 점검하세요. 자동으로 다시 점검하지 않습니다.' },
-  { key: 'no-model', pattern: /NO_?MODEL|MODEL_NOT|MODELS?_(?:EMPTY|NONE|UNAVAILABLE)|MODEL_COUNT/iu, title: '쓸 수 있는 모델 없음', guide: '담당자에게 모델 허용 설정 확인을 요청하세요.' },
+  { key: 'rate-timeout-network', pattern: /RATE|TOO_MANY|429|TIMEOUT|TIMED?_?OUT|NETWORK|OFFLINE|FETCH|ECONN|UNREACHABLE|SERVER_UNAVAILABLE|GATEWAY/iu, title: '요청 제한·시간 초과·네트워크', guide: '잠시 뒤에 직접 다시 점검하세요. 자동으로 다시 점검하지 않습니다.' },
+  { key: 'no-model', pattern: /NO_?MODEL|MODEL_NOT|MODELS?_(?:LIST_)?(?:EMPTY|NONE|UNAVAILABLE)|MODEL_COUNT/iu, title: '쓸 수 있는 모델 없음', guide: '담당자에게 모델 허용 설정 확인을 요청하세요.' },
   { key: 'hours', pattern: /HOURS|TIME_WINDOW|SCHEDULE|OUTSIDE_|CLOSED|NOT_OPEN/iu, title: '이용 시간', guide: '이용 시간이 아닙니다. 이용 시간을 확인하세요.' },
-  { key: 'limits', pattern: /QUOTA|USAGE|BUDGET|CLASS_(?:LIMIT|CAP)|LIMIT_EXCEEDED|EXHAUST/iu, title: '사용량·한도', guide: '반 사용량 또는 이용 한도 문제입니다. 담당자에게 확인하세요.' },
+  { key: 'limits', pattern: /QUOTA|USAGE|BUDGET|CLASS_(?:LIMIT|CAP)|LIMIT_(?:EXCEEDED|REACHED)|EXHAUST/iu, title: '사용량·한도', guide: '반 사용량 또는 이용 한도 문제입니다. 담당자에게 확인하세요.' },
   { key: 'forbidden', pattern: /FORBID|DENIED|ACCESS|403|BLOCK/iu, title: '접근 제한', guide: '접근이 제한되었습니다. 계정 연결을 다시 확인하고 담당자에게 문의하세요.' },
+  { key: 'authorization-changed', pattern: /AUTHORIZATION_CHANGED/iu, title: '권한 변경', guide: '점검하는 도중 권한 내용이 바뀌었습니다. 담당자에게 현재 권한을 확인해 달라고 요청한 뒤 직접 다시 점검하세요.' },
   { key: 'auth', pattern: /AUTH|LOGIN|TOKEN|CREDENTIAL|401|EXPIRED/iu, title: '인증', guide: '인증에 실패했습니다. 계정 연결을 다시 확인하고, 계속되면 담당자에게 문의하세요.' },
   { key: 'permission-pending', pattern: /PREPAR|PENDING|NOT_READY|UNVERIFIED|NOT_CONNECTED|NO_AUDIENCE|PERMISSION|UNAVAILABLE/iu, title: '권한 준비 중·확인 불가', guide: '운영 측 계정·앱 권한 준비 중이거나 확인할 수 없는 상태입니다. 학생 잘못이 아닙니다. 담당자에게 계정 연결과 앱 권한 확인을 요청하세요.' },
 ]);
