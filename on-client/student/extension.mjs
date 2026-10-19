@@ -491,6 +491,98 @@ function renderStatus(input) {
   return root;
 }
 
+// ── 17단계: 수업용 AI(알레프게이트) 연결 점검과 사건 설명 기초 ─────────────────────────────
+// 연결 점검(모델 목록 확인)과 실제 사건 설명 실행은 서로 다른 일입니다. 점검이 ok 여도 사건 설명이 된 것으로 쓰지 않습니다.
+// 이 함수들은 어떤 요청도 보내지 않고 자동으로 다시 점검하지 않습니다. 호출할 때마다 새 화면을 만들어
+// 이전 점검 결과(권한·인증 오류 안내 등)가 남지 않습니다. 열쇠·토큰·원문 오류는 safeValue 로 가려서만 보입니다.
+const AI_AUDIENCE_LABELS = Object.freeze({ test: '시험 연결 점검(test)', verified: '앱 권한 확인 후 점검(verified)' });
+
+// 오류 코드를 원인별 안내로 나눕니다. 먼저 맞는 항목이 이깁니다(예: RATE_LIMIT 는 한도가 아니라 요청 제한).
+const AI_ERROR_GUIDES = Object.freeze([
+  { key: 'cancelled', pattern: /CANCEL|ABORT/iu, title: '취소', guide: '취소되었습니다. 이전 점검 결과는 현재 결과가 아닙니다. 필요하면 직접 다시 점검하세요.' },
+  { key: 'rate-timeout-network', pattern: /RATE|TOO_MANY|429|TIMEOUT|TIMED?_?OUT|NETWORK|OFFLINE|FETCH|ECONN|UNREACHABLE/iu, title: '요청 제한·시간 초과·네트워크', guide: '잠시 뒤에 직접 다시 점검하세요. 자동으로 다시 점검하지 않습니다.' },
+  { key: 'no-model', pattern: /NO_?MODEL|MODEL_NOT|MODELS?_(?:EMPTY|NONE|UNAVAILABLE)|MODEL_COUNT/iu, title: '쓸 수 있는 모델 없음', guide: '담당자에게 모델 허용 설정 확인을 요청하세요.' },
+  { key: 'hours', pattern: /HOURS|TIME_WINDOW|SCHEDULE|OUTSIDE_|CLOSED|NOT_OPEN/iu, title: '이용 시간', guide: '이용 시간이 아닙니다. 이용 시간을 확인하세요.' },
+  { key: 'limits', pattern: /QUOTA|USAGE|BUDGET|CLASS_(?:LIMIT|CAP)|LIMIT_EXCEEDED|EXHAUST/iu, title: '사용량·한도', guide: '반 사용량 또는 이용 한도 문제입니다. 담당자에게 확인하세요.' },
+  { key: 'forbidden', pattern: /FORBID|DENIED|ACCESS|403|BLOCK/iu, title: '접근 제한', guide: '접근이 제한되었습니다. 계정 연결을 다시 확인하고 담당자에게 문의하세요.' },
+  { key: 'auth', pattern: /AUTH|LOGIN|TOKEN|CREDENTIAL|401|EXPIRED/iu, title: '인증', guide: '인증에 실패했습니다. 계정 연결을 다시 확인하고, 계속되면 담당자에게 문의하세요.' },
+  { key: 'permission-pending', pattern: /PREPAR|PENDING|NOT_READY|UNVERIFIED|NOT_CONNECTED|NO_AUDIENCE|PERMISSION|UNAVAILABLE/iu, title: '권한 준비 중·확인 불가', guide: '운영 측 계정·앱 권한 준비 중이거나 확인할 수 없는 상태입니다. 학생 잘못이 아닙니다. 담당자에게 계정 연결과 앱 권한 확인을 요청하세요.' },
+]);
+
+function aiErrorGuide(error) {
+  const code = error && typeof error.code === 'string' ? error.code : '';
+  return AI_ERROR_GUIDES.find(item => item.pattern.test(code)) ?? {
+    key: 'unknown', title: '확인 불가', guide: '원인을 확인할 수 없습니다. 연결 상태를 확인하고 담당자에게 문의하세요.' };
+}
+
+function aiErrorBox(error) {
+  const guide = aiErrorGuide(error);
+  const box = textNode('div', '', { 'data-student-ai-error': guide.key });
+  box.append(
+    textNode('p', `AI 연결 점검 실패: ${guide.title}`),
+    textNode('p', `오류 코드: ${safeValue(error && error.code, 60)} · 메시지: ${safeValue(error && error.message, 160)}`),
+    textNode('p', guide.guide),
+  );
+  return box;
+}
+
+function renderAiConnection(input) {
+  const view = input && typeof input === 'object' ? input : {};
+  const root = textNode('div', '', { 'data-student-ai-connection': 'true' });
+  const mode = modeOf(view);
+  if (mode !== 'connected') root.append(textNode('p', MODE_NOTICES[mode], { 'data-student-mode': mode }));
+  const status = view.status;
+  if (status === 'idle') {
+    root.setAttribute('data-student-ai-state', 'idle');
+    root.append(textNode('p', 'AI 연결 점검 전'));
+  } else if (status === 'loading') {
+    root.setAttribute('data-student-ai-state', 'loading');
+    root.append(textNode('p', 'AI 연결 점검 중', { role: 'status' }));
+  } else if (status === 'ok' && view.data && typeof view.data === 'object') {
+    root.setAttribute('data-student-ai-state', 'ok');
+    const audience = Object.hasOwn(AI_AUDIENCE_LABELS, view.data.audienceAuthorization) ? AI_AUDIENCE_LABELS[view.data.audienceAuthorization] : `확인 불가(${safeValue(view.data.audienceAuthorization, 30)})`;
+    root.append(
+      textNode('p', `AI 연결 점검 결과: ${audience}`),
+      textNode('p', `사용할 수 있는 모델 수: ${safeValue(view.data.modelCount, 20)} · 점검 시각: ${safeValue(view.checkedAt, 40)}`),
+      textNode('p', view.explanationAccepted === true
+        ? '사건 설명은 사건 설명 화면에서 따로 확인한 결과가 있습니다. 이 연결 점검 결과와는 별개입니다.'
+        : '연결만 점검했습니다. 사건 설명은 아직 실행하지 않았습니다. 모델 목록 응답은 사건 설명이 아닙니다.', { 'data-student-ai-note': 'connection-only' }),
+    );
+  } else if (status === 'error') {
+    root.setAttribute('data-student-ai-state', 'error');
+    root.append(aiErrorBox(view.error));
+  } else {
+    root.setAttribute('data-student-ai-state', 'unknown');
+    root.append(textNode('p', '확인 불가: AI 연결 점검 상태를 읽을 수 없습니다.'));
+  }
+  root.append(textNode('p', '다시 점검은 「현재 API 연결 점검」 버튼을 직접 누르는 것입니다. 자동으로 다시 점검하지 않습니다.'));
+  return root;
+}
+
+// 18단계에서 넓힙니다. 지금은 설명이 성공일 때만 사건 표시(data-student-explanation-event)를 붙입니다.
+function renderExplanation(input) {
+  const view = input && typeof input === 'object' ? input : {};
+  const explanation = view.explanation && typeof view.explanation === 'object' ? view.explanation : {};
+  const eventId = view.event && typeof view.event === 'object' ? safeValue(view.event.id, 80) : '(없음)';
+  if (explanation.status === 'ok' && explanation.data && typeof explanation.data === 'object') {
+    const root = textNode('div', '', { 'data-student-explanation-event': String(eventId) });
+    root.append(
+      textNode('p', `사건 ID: ${eventId}`),
+      textNode('p', `AI 설명 요약: ${safeValue(explanation.data.summary, 400)}`),
+      textNode('p', `확인 시각: ${safeValue(view.checkedAt, 40)}`),
+    );
+    return root;
+  }
+  const root = textNode('div', '', { 'data-student-explanation-failed': 'true' });
+  const error = explanation.error && typeof explanation.error === 'object' ? explanation.error : {};
+  root.append(
+    textNode('p', `AI 설명을 받지 못했습니다. 사건 ID: ${eventId}`),
+    textNode('p', `오류 코드: ${safeValue(error.code, 60)} · 메시지: ${safeValue(error.message, 160)}`),
+    textNode('p', '사건 기록과 접속 판정은 그대로입니다. AI 설명 실패가 기존 기록을 바꾸지 않습니다.'),
+  );
+  return root;
+}
+
 export function createStudentView() {
   return {
     renderIdentity,
@@ -498,8 +590,8 @@ export function createStudentView() {
     renderEvents,
     renderStatus,
     renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
-    renderAiConnection() { return '학생 구현 대기: 모델 응답 점검과 실제 사건 설명을 구분하고 AI 오류·취소·수동 복구를 안내하세요.'; },
-    renderExplanation() { return '학생 구현 대기: 선택한 사건의 근거·규칙·현재 상태와 AI 설명을 연결하세요. 제안은 자동 실행하지 않습니다.'; },
+    renderAiConnection,
+    renderExplanation,
     renderAction() { return '학생 구현 대기: 현재 사건·조치·실제 대상·사람 확인·ACK와 원천 효과·unknown을 구분하세요.'; },
   };
 }
