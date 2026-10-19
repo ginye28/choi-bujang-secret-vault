@@ -1,4 +1,62 @@
-# 자료실 — 12단계 저장점
+# 방어전 케셰브 — 보안 Agent 13~22단계 (진행 중)
+
+공식 4~6차 트랙입니다. `on-client/` 가 시작 틀(0.2.11)이고, 학생이 고치는 파일은 `on-client/student/extension.mjs` 하나입니다. 제공 파일(`public/`, `src/`, `vendor/`, `tools/`)은 고치지 않았고 원본 해시와 같습니다.
+
+| 단계 | 구현 | 커밋 | 서버 판정 |
+|---|---|---|---|
+| 13 | `renderIdentity` | `253f267` | 통과 |
+| 14 | `renderDecision` | `873f005` | 통과 |
+| 15 | `renderEvents` | `caf58b0` | 통과 |
+| 16 | `renderStatus` + 15단계 상세의 미지원 조치 안내 | `ee2de7c` | 제출함(판정 대기 확인 필요) |
+| 17~22 | 미구현 — 반에 아직 공개되지 않음 | — | — |
+
+- 실행: `cd on-client && npm run demo`(예제 자료) 또는 `npm start`(연결 없음 상태) 후 http://127.0.0.1:5189 . 구문 확인은 `npm run check`.
+- 모의 자료 시험: `node --test test/on-client/*.test.mjs`(30개). AI 판정과 별개이며 실제 연결 성취가 아닙니다.
+- 제출: 방어전 화면 `https://aleph-omega.vercel.app/defense?tab=alekov` 에서 저장소 주소와 커밋 40자리를 냅니다. 단계마다 그 단계 함수만 고치고 커밋·푸시합니다.
+- 비밀값(열쇠·토큰·`.env`)은 저장소에 넣지 않습니다. 17단계의 AI 연결 승인은 본인 계정으로 포털에서 직접 해야 합니다.
+
+---
+
+# 자료실 — 보안 운영 웹앱 v0.5 (4차)
+
+## 4차 제품: 정책·사건·대응·복구 (v0.5)
+
+3차까지 만든 자료실(`api/notes` 등)은 그대로 두고, 같은 저장소에 보안 운영 웹앱을 더했습니다. 주소는 `/api/product/v1/*` 이고 진입점은 [api/product/[...path].mjs](api/product/[...path].mjs) 입니다. HTTP 계약은 [docs/HTTP_CONTRACT_r3.md](docs/HTTP_CONTRACT_r3.md), 시작 틀 안내는 [docs/PRODUCT_STARTER_README.md](docs/PRODUCT_STARTER_README.md) 입니다.
+
+### 기능 (모두 `src/product/` 에서 구현, `index.mjs` 에서 내보냄)
+| 기능 | 파일 | 하는 일 |
+|---|---|---|
+| D1 정책 | `policy.mjs` | 초안 검사 → 활성화 → 판 번호 +1, 변경 기록, 예전 판으로 되돌리기(새 판 번호). 정책이 바뀌면 다음 요청부터 판정이 달라집니다. 판 번호 경합은 409, 동시에 둘이 바꾸면 하나만 성공. 일반 사용자의 변경은 403. |
+| 보호 자원 | `resources.mjs` | 읽기·쓰기마다 ① 차단 여부 ② 활성 정책 순서로 판정하고 판정 근거를 응답 머리글(`X-Aleph-*`)에 적습니다. 소유자는 본문이 아니라 토큰으로 정합니다. |
+| D2 사건 | `events.mjs` | 같은 사건은 한 번만 저장, 같은 id·다른 내용은 충돌, 형식이 틀린 사건이 하나라도 있으면 묶음 전체 400. 받은 순서와 관계없이 시각 순 조회(커서). `burst_read` 로 몰린 읽기를 사건 묶음으로 만듭니다. |
+| D3 대응 | `responses.mjs` | 제안 → 사람이 승인한 뒤에만 집행. 같은 작업 키는 딱 한 번만 집행(동시 승인 포함). 503·429·응답 유실은 계약의 재시도 규칙(1초·2초, 최대 2회)으로 다시 시도하고, 그래도 안 되면 `pending`(보류)로 남깁니다. 해제도 기록하며 실제로 풀렸는지 확인한 뒤에만 `released` 로 적습니다. |
+| D4 복구 | `backup.mjs` | 정책·사건 백업. 복원 전에 백업 전체를 검사하고(손상·다른 프로젝트·금지 내용은 422), 반영은 한 트랜잭션이라 도중에 실패하면 아무것도 바뀌지 않습니다. 정책은 새 판 번호(`restore`)로 반영하고 감사 기록은 건드리지 않습니다. |
+
+설정값(탐지 시간 창·건수, 승인 유효기간, 재시도 예산)은 [src/product/config.mjs](src/product/config.mjs) 한 곳에 있습니다. 시각은 `ctx.clock()`, 대기는 `ctx.sleep()` 만 씁니다.
+
+### 정책·탐지 규칙
+| 규칙 | 뜻 | 확인한 방법 |
+|---|---|---|
+| 규칙 어휘 | `match` 의 `method`·`zone`·`owner`·`role` 만 허용. 모르는 항목·이상한 값은 422 `policy_rules` | `test/product/own.test.mjs` |
+| 선택 순서 | 맞는 규칙 중 `priority` 가 큰 것, 같으면 deny > step_up > allow. 맞는 규칙이 없거나 정책이 없으면 deny(`no_rule`) | 공개 시험 D1-6, 직접 시험 |
+| `burst_read` | 같은 subject 의 `read` 사건이 시각 차 600,000ms 미만으로 121건 이상 | 공개 시험 D2-3·D2-4, 경계 직접 시험 |
+| 차단 | 승인·집행된 `subject:<userId>` 는 정책과 관계없이 403 `blocked`. 차단 상태를 확인하지 못하면 503(열지 않음) | 공개 시험 D3-2, 직접 시험 |
+
+### 다시 실행하기
+1. 설치: 외부 패키지가 더 필요하지 않습니다(Node 22 이상).
+2. 시험: `npm test`(공개 22개), `npm run test:own`(직접 24개), `npm run test:all`(둘 다).
+3. 내 PC에서 돌리기: `node scripts/test-identities.mjs --local` → `npm run start:local` → `http://127.0.0.1:8787/` (연습 계정 비밀번호는 터미널에만 나오며 어디에도 올리지 않습니다). `.data/` 는 Git 에 올리지 않습니다.
+4. 배포(기본 경로): 내 Supabase SQL 편집기에서 [supabase/product_kv.sql](supabase/product_kv.sql) → [supabase/product_operator.sql](supabase/product_operator.sql)(본인 계정 UUID·프로젝트 ID 입력) 순서로 한 번 실행하고, Vercel 환경변수 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `PRODUCT_PROJECT_ID` 를 입력합니다. 값은 저장소에 두지 않습니다(기존 자료실의 `SUPABASE_SECRET_KEY` 와 이름이 다릅니다).
+5. 되돌리기: Vercel 대시보드에서 직전 배포로 되돌리거나 `git revert <커밋>` 후 push. `git reset --hard` 는 쓰지 않습니다.
+
+### 확인한 것과 하지 않은 것
+- **확인함(내 PC)**: 공개 시험 22개 통과, 직접 시험 24개 통과, 로컬 서버에 실제 HTTP 로 21단계 흐름(로그인·정책 활성화·자료 읽기 거부·사건 130건·동시 승인 3번·차단·해제·손상 백업 거부·복원) 통과.
+- **미실행**: 배포된 Vercel·Supabase 에서의 실제 호출, `product_kv.sql` 실행, 제공자 집행 서비스(`ALEPH_EXECUTOR_URL`)를 통한 집행, 공식 시험 신원 등록(제공 쪽 미완료), 서버 판정. 공개 시험 통과는 공식 합격이 아닙니다.
+- **알려진 한계**: 백업은 사건이 5,000건·512KiB 를 넘으면 오래된 사건부터 뺍니다. 사건 묶음은 subject 당 하나라 한 번 만들어진 뒤에는 닫히지 않고 같은 묶음이 고쳐집니다. Supabase 저장소의 `list()` 읽기는 새 행이 끼어드는 경우를 낙관적 잠금으로 막지 못합니다(제공 어댑터의 한계). 기존 자료실(`api/notes` 등)은 이 제품과 별도로 동작합니다. `api/ai.js`·`api/threat-intel.js` 는 시작 틀의 미구현(501) 뼈대 그대로입니다.
+
+---
+
+# 이전 저장점: 12단계
 
 ## 12단계: 탈환 작전실 — 1~11단계를 한 곳에서 확인합니다
 

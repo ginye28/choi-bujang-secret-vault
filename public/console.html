@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>운영 콘솔</title>
+<style>
+  :root { color-scheme: light dark; --line: #8886; --bg2: #8881; }
+  body { font-family: system-ui, sans-serif; margin: 1rem auto; padding: 0 1rem; max-width: 1040px; line-height: 1.5; }
+  h1 { margin: 0 0 .5rem; font-size: 1.4rem; }
+  h2 { font-size: 1.05rem; margin: 0 0 .5rem; }
+  section { border: 1px solid var(--line); border-radius: 8px; padding: .75rem 1rem; margin-bottom: 1rem; }
+  textarea, input { font: inherit; box-sizing: border-box; max-width: 100%; }
+  textarea { width: 100%; min-height: 6.5rem; font-family: ui-monospace, monospace; font-size: .85rem; }
+  button { font: inherit; padding: .25rem .7rem; margin: .15rem .15rem .15rem 0; cursor: pointer; }
+  pre { background: var(--bg2); padding: .75rem; overflow: auto; max-height: 20rem; font-size: .8rem; }
+  .row { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-bottom: .4rem; }
+  .note { font-size: .85rem; opacity: .8; }
+  #who { font-weight: 600; }
+</style>
+</head>
+<body>
+<!-- 운영 콘솔. 화면은 서버 응답을 그대로 보여 줄 뿐 판정하지 않습니다. "성공" 표시를 따로 만들지 않습니다.
+     토큰은 이 화면의 메모리에만 있고 어디에도 저장하지 않습니다(새로고침하면 다시 로그인). -->
+<h1>운영 콘솔</h1>
+<section>
+  <h2>로그인</h2>
+  <div class="row">
+    <input id="email" type="email" placeholder="이메일" autocomplete="username">
+    <input id="password" type="password" placeholder="비밀번호" autocomplete="current-password">
+    <button id="login">로그인</button>
+    <button id="health">서버 상태</button>
+    <span id="who">로그인 전</span>
+  </div>
+</section>
+
+<section>
+  <h2>D1 정책</h2>
+  <div class="row"><button data-call="GET /policy">지금 정책</button><button data-call="GET /policy/history?limit=20">변경 기록(operator)</button></div>
+  <textarea id="policyRules" aria-label="규칙 목록 JSON">[{"id":"own-notes","effect":"allow","match":{"zone":"notes","owner":"self"}},{"id":"write-notes","effect":"allow","match":{"zone":"notes","method":"POST"}}]</textarea>
+  <div class="row">
+    <button id="policyApply">검사 후 활성화</button>
+    <input id="rollbackTo" type="number" min="1" placeholder="되돌릴 판 번호" style="width:9rem">
+    <button id="policyRollback">이 판으로 되돌리기</button>
+  </div>
+  <p class="note">활성화는 먼저 초안을 검사해 만들고, 지금 판 번호를 함께 보내 경합을 막습니다. 되돌리기도 새 판 번호로 기록됩니다.</p>
+</section>
+
+<section>
+  <h2>보호 자원</h2>
+  <div class="row">
+    <input id="zone" value="notes" aria-label="구역" style="width:7rem">
+    <button id="resWrite">내 자료 쓰기</button>
+    <input id="resId" placeholder="자료 id" aria-label="자료 id" style="width:20rem">
+    <button id="resRead">읽기</button>
+  </div>
+</section>
+
+<section>
+  <h2>D2 사건</h2>
+  <textarea id="eventsJson" aria-label="사건 JSON">[{"id":"ev-1","at":"2026-10-20T00:00:00.000Z","kind":"read","subject":"u-1"}]</textarea>
+  <div class="row">
+    <button id="eventsIngest">사건 저장(operator)</button>
+    <button data-call="GET /events?limit=50">사건 조회(시각 순)</button>
+    <button data-call="GET /incidents">사건 묶음 목록</button>
+  </div>
+</section>
+
+<section>
+  <h2>D3 대응</h2>
+  <div class="row">
+    <input id="incidentId" placeholder="사건 묶음 id" aria-label="사건 묶음 id" style="width:16rem">
+    <input id="targetUser" placeholder="차단할 사용자 id" aria-label="차단할 사용자 id" style="width:18rem">
+    <button id="respCreate">차단 제안</button>
+  </div>
+  <div class="row">
+    <input id="opKey" placeholder="작업 키" aria-label="작업 키" style="width:22rem">
+    <button data-op="approve">승인</button><button data-op="reject">거절</button><button data-op="release">해제</button><button data-op="get">상태</button>
+  </div>
+  <p class="note">제안만으로는 아무도 막히지 않습니다. 승인한 뒤에만 집행되며, 응답에서 보류(pending)는 완료가 아닙니다.</p>
+</section>
+
+<section>
+  <h2>D4 복구</h2>
+  <div class="row"><button id="backupMake">백업 만들기(operator)</button><button id="restoreRun">아래 백업으로 복원</button></div>
+  <textarea id="backupJson" aria-label="백업 JSON" placeholder="백업 만들기를 누르면 여기에 채워집니다. 복원할 백업을 붙여 넣어도 됩니다."></textarea>
+  <p class="note">복원 전에 백업 전체를 검사하고, 손상·다른 프로젝트·금지 내용이면 아무것도 바꾸지 않고 거부합니다.</p>
+</section>
+
+<section>
+  <h2>서버 응답</h2>
+  <pre id="out">아직 요청하지 않았습니다.</pre>
+</section>
+<script type="module">
+  const base = '/api/product/v1';
+  const $ = id => document.getElementById(id);
+  let token = null;
+  let revision = 0;
+  let me = null;
+  const show = (res, text) => { $('out').textContent = `${res.status}\n${text}`; };
+  async function call(method, path, body) {
+    const res = await fetch(base + path, {
+      method,
+      headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const text = await res.text();
+    const decision = res.headers.get('x-aleph-decision');
+    show(res, (decision ? `판정 ${decision} · 규칙 ${res.headers.get('x-aleph-rule-ids') || '-'} · 정책 ${res.headers.get('x-aleph-policy-revision')}판\n` : '') + text);
+    let parsed = null;
+    try { parsed = text ? JSON.parse(text) : null; } catch { /* 본문이 JSON 이 아니면 그대로 둡니다 */ }
+    return { status: res.status, body: parsed };
+  }
+  const json = (el, fallback) => { try { return JSON.parse($(el).value); } catch { show({ status: '입력 오류' }, `${fallback} 의 JSON 형식을 확인하세요.`); return undefined; } };
+
+  $('login').onclick = async () => {
+    const r = await call('POST', '/auth/login', { email: $('email').value, password: $('password').value });
+    token = r.status === 200 ? r.body.accessToken : null;
+    $('password').value = '';
+    if (token) { me = (await call('GET', '/me')).body; $('who').textContent = `${me.role} 로 로그인`; } else { me = null; $('who').textContent = '로그인 실패'; }
+  };
+  $('health').onclick = () => call('GET', '/health');
+  document.querySelectorAll('[data-call]').forEach(b => { b.onclick = () => { const [m, p] = b.dataset.call.split(' '); return call(m, p); }; });
+
+  $('policyApply').onclick = async () => {
+    const rules = json('policyRules', '규칙 목록'); if (!rules) return;
+    const cur = await call('GET', '/policy');
+    revision = cur.body?.active?.revision ?? 0;
+    const snapshot = { schema: 'aleph.product.policy.v1', projectId: undefined, revision: revision + 1, rules };
+    // projectId 는 서버가 확인하므로 지금 정책에서 가져오거나, 없으면 /health 의 값을 씁니다.
+    const health = (await call('GET', '/health')).body;
+    snapshot.projectId = cur.body?.active?.projectId ?? health.projectId;
+    const draft = await call('POST', '/policy/drafts', { snapshot });
+    if (draft.status !== 201) return;
+    await call('POST', '/policy/activate', { draftId: draft.body.draftId, expectedRevision: revision });
+  };
+  $('policyRollback').onclick = async () => {
+    const cur = await call('GET', '/policy');
+    await call('POST', '/policy/rollback', { toRevision: Number($('rollbackTo').value), expectedRevision: cur.body?.active?.revision ?? 0 });
+  };
+
+  $('resWrite').onclick = async () => { const r = await call('POST', `/resources/${encodeURIComponent($('zone').value)}`, { data: { text: '콘솔에서 만든 연습 자료' } }); if (r.body?.id) $('resId').value = r.body.id; };
+  $('resRead').onclick = () => call('GET', `/resources/${encodeURIComponent($('zone').value)}/${encodeURIComponent($('resId').value)}`);
+
+  $('eventsIngest').onclick = () => { const events = json('eventsJson', '사건'); if (events) call('POST', '/events', { events }); };
+
+  $('respCreate').onclick = async () => {
+    const operationKey = crypto.randomUUID();
+    const r = await call('POST', '/responses', { operationKey, incidentId: $('incidentId').value, target: `subject:${$('targetUser').value}`, action: 'block_subject', payload: { reason: 'burst_read' } });
+    if (r.status === 201) $('opKey').value = operationKey;
+  };
+  document.querySelectorAll('[data-op]').forEach(b => {
+    b.onclick = () => (b.dataset.op === 'get' ? call('GET', `/responses/${$('opKey').value}`) : call('POST', `/responses/${$('opKey').value}/${b.dataset.op}`));
+  });
+
+  $('backupMake').onclick = async () => { const r = await call('POST', '/backups', {}); if (r.status === 200) $('backupJson').value = JSON.stringify(r.body, null, 2); };
+  $('restoreRun').onclick = () => { const backup = json('backupJson', '백업'); if (backup) call('POST', '/restore', { backup }); };
+</script>
+</body>
+</html>
