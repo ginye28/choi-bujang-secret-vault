@@ -8,13 +8,14 @@
 | 14 | `renderDecision` | `873f005` | 통과 |
 | 15 | `renderEvents` | `caf58b0` | 통과 |
 | 16 | `renderStatus` + 15단계 상세의 미지원 조치 안내 | `ee2de7c` | 통과 |
-| 17 | `renderAiConnection`(점검 전·중·ok·오류 구분, 연결만 점검한 상태와 사건 설명 구분) + `renderExplanation` 기초 | 이번 커밋 | 제출 예정 |
+| 17 | `renderAiConnection`(점검 전·중·ok·오류 구분, 연결만 점검한 상태와 사건 설명 구분) + `renderExplanation` | `49e667e`(제출용 브랜치 `submit-17-22` `bf43a43`) | 표시 구현 7/9 충족. `ai_transport_checked`·`ai_model_called` 는 실제 AI 연결(계정 연결·승인) 확인 전이라 확인 불가 |
 | 18~20 | 미구현 | — | — |
 | 21~22 | 미구현 — 반에 아직 공개되지 않음 | — | — |
 
 - 실행: `cd on-client && npm run demo`(예제 자료) 또는 `npm start`(연결 없음 상태) 후 http://127.0.0.1:5189 . 구문 확인은 `npm run check`.
 - 모의 자료 시험: `node --test test/on-client/*.test.mjs`(37개). AI 판정과 별개이며 실제 연결 성취가 아닙니다.
 - 제출: 방어전 화면 `https://aleph-omega.vercel.app/defense?tab=alekov` 에서 저장소 주소와 커밋 40자리를 냅니다. 단계마다 그 단계 함수만 고치고 커밋·푸시합니다.
+- **실제 AI 연결 상태(2026-10-19)**: `tools/prepare-native-host.ps1 -ProjectRoot <프로젝트> -HostRoot <프로젝트 밖 새 폴더> -Create` 로 `native.json` 을 만들고 `node src/server.mjs --native-host-config <경로>` 로 켜면 `NATIVE_HOST_DISABLED` 가 사라집니다. 이후 수업용 AI 게이트(`ai-classroom-gateway-production`)의 `/api/apps/aleph-on/*`(native-login·connect·v1) 경로가 404 라 계정 연결이 `NATIVE_HOST_UNVERIFIED` 로 멈춥니다. 게이트에 해당 경로가 반영되면 계정 연결 → AI 연결 승인 → 「현재 API 연결 점검」을 이어서 합니다.
 - 비밀값(열쇠·토큰·`.env`)은 저장소에 넣지 않습니다. 17단계의 AI 연결 승인은 본인 계정으로 포털에서 직접 해야 합니다.
 
 ---
