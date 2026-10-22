@@ -89,7 +89,7 @@ test('renderExplanation: 성공일 때만 사건 표시를 붙이고 실패·근
   const okExplanation = { status: 'ok', data: { summary: '반복 로그인 실패 뒤 성공', evidenceIds: ['e1'], proposals: [], requiresHumanConfirmation: true, executed: false } };
   const ok = view.renderExplanation({ event, explanation: okExplanation, checkedAt: '2026-10-19T00:00:00Z' });
   assert.equal(ok.getAttribute('data-student-explanation-event'), 'evt-7');
-  for (const want of ['evt-7', '반복 로그인 실패 뒤 성공', '근거 글', '규칙 글']) assert.ok(ok.textContent.includes(want), want);
+  for (const want of ['evt-7', '반복 로그인 실패 뒤 성공', 'e1', '실행되지 않았습니다']) assert.ok(ok.textContent.includes(want), want);
   const failed = view.renderExplanation({ event, explanation: { status: 'error', error: { code: 'WB_CLCO_TIMEOUT', message: '시간 초과' } }, checkedAt: '2026-10-19T00:00:00Z' });
   assert.equal(failed.getAttribute('data-student-explanation-event'), null);
   assert.ok(failed.textContent.includes('WB_CLCO_TIMEOUT') && failed.textContent.includes('그대로'));

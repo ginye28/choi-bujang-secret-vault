@@ -491,39 +491,45 @@ function renderStatus(input) {
   return root;
 }
 
+// 여러 코드가 같은 안내를 쓰는 경우 문장을 한 번만 둡니다.
+const ASK = '담당자에게 확인하세요.';
+const NOT_STUDENT = '학생 잘못이 아닙니다. 담당자에게 계정 권한, native 호스트 설정, 수업용 AI 게이트 반영 여부를 확인해 달라고 요청하세요.';
+const TIMEOUT_GUIDE = 'AI 응답 시간이 초과됐습니다. 연결 상태를 확인한 뒤 필요하면 직접 다시 점검하세요.';
+const CANCEL_GUIDE = 'AI 점검을 취소했습니다. 이전 결과는 현재 점검 결과가 아닙니다.';
+const FORMAT_GUIDE = `AI 서버 응답 형식을 확인할 수 없습니다. ${ASK}`;
 const AI_CONNECTION_GUIDANCE = Object.freeze({
-  ON_AI_PROVISIONING_PENDING: '학생 앱 전용 AI 권한·연결 준비가 아직 끝나지 않았습니다. 담당자에게 확인하세요.',
+  ON_AI_PROVISIONING_PENDING: `학생 앱 전용 AI 권한·연결 준비가 아직 끝나지 않았습니다. ${ASK}`,
   WB_CLCO_AUTH_REQUIRED: '앱 전용 이용 인증을 확인할 수 없습니다. Workbench 열쇠를 복사하지 말고 담당자에게 확인하세요.',
-  WB_CLCO_ACCESS_BLOCKED: '학생 앱의 AI 이용 권한이 허용되지 않았습니다. 담당자에게 확인하세요.',
+  WB_CLCO_ACCESS_BLOCKED: `학생 앱의 AI 이용 권한이 허용되지 않았습니다. ${ASK}`,
   SUBJECT_SCOPE_UNVERIFIED: '현재 로그인과 프로젝트 범위를 확인할 수 없습니다. 계정 연결을 확인하고 담당자에게 문의하세요.',
   ON_AI_AUTHORIZATION_CHANGED: '점검 중 AI 이용 권한이 바뀌었습니다. 담당자에게 현재 권한을 확인하세요.',
   WB_CLCO_SESSION_CLOSED: '현재는 AI 이용 시간이 아닙니다. 이용 시간을 확인하세요.',
-  WB_CLCO_COHORT_BUDGET_EXHAUSTED: '반의 AI 사용량이 소진됐습니다. 담당자에게 확인하세요.',
+  WB_CLCO_COHORT_BUDGET_EXHAUSTED: `반의 AI 사용량이 소진됐습니다. ${ASK}`,
   WB_CLCO_RATE_LIMITED: 'AI 요청이 잠시 제한됐습니다. 잠시 기다린 뒤 직접 다시 점검하세요.',
-  WB_CLCO_LIMIT_REACHED: 'AI 이용 한도에 도달했습니다. 담당자에게 확인하세요.',
-  WB_CLCO_TIMEOUT: 'AI 응답 시간이 초과됐습니다. 연결 상태를 확인한 뒤 필요하면 직접 다시 점검하세요.',
+  WB_CLCO_LIMIT_REACHED: `AI 이용 한도에 도달했습니다. ${ASK}`,
+  WB_CLCO_TIMEOUT: TIMEOUT_GUIDE,
+  TIMEOUT: TIMEOUT_GUIDE,
   REQUEST_TIMEOUT: '서버의 AI 응답 시간이 초과됐습니다. 필요하면 직접 다시 점검하세요.',
   ENGINE_TIMEOUT: '서버의 확인 시간이 초과됐습니다. 필요하면 직접 다시 점검하세요.',
-  TIMEOUT: 'AI 응답 시간이 초과됐습니다. 연결 상태를 확인한 뒤 필요하면 직접 다시 점검하세요.',
   WB_CLCO_SERVER_UNAVAILABLE: 'AI 서버가 응답하지 않습니다. 연결을 확인하고 필요하면 직접 다시 점검하세요.',
   WB_CLCO_NETWORK_ERROR: 'AI 서버에 연결할 수 없습니다. 네트워크 상태를 확인하고 필요하면 직접 다시 점검하세요.',
-  WB_CLCO_CANCELLED: 'AI 점검을 취소했습니다. 이전 결과는 현재 점검 결과가 아닙니다.',
-  CANCELLED: 'AI 점검을 취소했습니다. 이전 결과는 현재 점검 결과가 아닙니다.',
-  REQUEST_CANCELLED: 'AI 점검을 취소했습니다. 이전 결과는 현재 점검 결과가 아닙니다.',
+  WB_CLCO_CANCELLED: CANCEL_GUIDE,
+  CANCELLED: CANCEL_GUIDE,
+  REQUEST_CANCELLED: CANCEL_GUIDE,
   MODEL_NOT_CONFIGURED: '앱 서버의 AI 모델 설정을 확인해야 합니다. 담당자에게 문의하세요.',
   ON_AI_MODEL_LIST_EMPTY: '현재 앱 권한으로 사용할 수 있는 모델이 없습니다. 담당자에게 모델 허용 설정을 확인하세요.',
   ON_AI_INVALID_INPUT: 'AI 점검 요청 형식을 확인할 수 없습니다. 새로고침한 뒤 직접 다시 점검하세요.',
-  ON_AI_INVALID_OUTPUT: 'AI 점검 응답 형식을 확인할 수 없습니다. 담당자에게 확인하세요.',
-  WB_CLCO_INVALID_RESPONSE: 'AI 서버 응답 형식을 확인할 수 없습니다. 담당자에게 확인하세요.',
-  WB_CLCO_INVALID_CONTENT_TYPE: 'AI 서버 응답 형식을 확인할 수 없습니다. 담당자에게 확인하세요.',
-  WB_CLCO_RESPONSE_TOO_LARGE: 'AI 서버 응답이 너무 큽니다. 담당자에게 확인하세요.',
+  ON_AI_INVALID_OUTPUT: `AI 점검 응답 형식을 확인할 수 없습니다. ${ASK}`,
+  WB_CLCO_INVALID_RESPONSE: FORMAT_GUIDE,
+  WB_CLCO_INVALID_CONTENT_TYPE: FORMAT_GUIDE,
+  WB_CLCO_RESPONSE_TOO_LARGE: `AI 서버 응답이 너무 큽니다. ${ASK}`,
   WB_CLCO_REDIRECT_BLOCKED: 'AI 서버 주소가 다른 곳으로 이동했습니다. 담당자에게 설정을 확인하세요.',
   WB_CLCO_INVALID_URL: 'AI 서버 주소 설정을 확인해야 합니다. 담당자에게 문의하세요.',
   WB_CLCO_INVALID_TOKEN: '앱 전용 인증 설정을 확인해야 합니다. 열쇠를 복사하지 말고 담당자에게 문의하세요.',
   WB_CLCO_INVALID_LIMIT: 'AI 요청 제한 시간 설정을 확인해야 합니다. 담당자에게 문의하세요.',
-  WB_CLCO_REQUEST_FAILED: 'AI 요청을 처리하지 못했습니다. 담당자에게 확인하세요.',
-  NATIVE_HOST_DISABLED: '학생 잘못이 아닙니다. 담당자에게 계정 권한, native 호스트 설정, 수업용 AI 게이트 반영 여부를 확인해 달라고 요청하세요.',
-  AI_REQUEST_UNVERIFIED: '실제 모델 목록과 사건 설명 호출은 아직 확인되지 않았습니다. 학생 잘못이 아닙니다. 담당자에게 계정 권한, native 호스트 설정, 수업용 AI 게이트 반영 여부를 확인해 달라고 요청하세요.',
+  WB_CLCO_REQUEST_FAILED: `AI 요청을 처리하지 못했습니다. ${ASK}`,
+  NATIVE_HOST_DISABLED: NOT_STUDENT,
+  AI_REQUEST_UNVERIFIED: `실제 모델 목록과 사건 설명 호출은 아직 확인되지 않았습니다. ${NOT_STUDENT}`,
 });
 
 function renderAiConnection(input) {
@@ -547,11 +553,8 @@ function renderAiConnection(input) {
     const code = safeValue(rawCode || 'AI_REQUEST_UNVERIFIED', 80);
     const message = view.error && typeof view.error.message === 'string' && view.error.message
       ? safeValue(view.error.message) : '서버가 안전한 오류 내용을 제공하지 않았습니다.';
-    const guidance = knownCode
-      ? AI_CONNECTION_GUIDANCE[rawCode]
-      : rawCode
-        ? '확인 불가: 학생 잘못이 아닙니다. 담당자에게 계정 권한·native 호스트 설정·수업용 AI 게이트 반영 여부를 확인해 달라고 요청하세요.'
-        : AI_CONNECTION_GUIDANCE.AI_REQUEST_UNVERIFIED;
+    const guidance = knownCode ? AI_CONNECTION_GUIDANCE[rawCode]
+      : rawCode ? `확인 불가: ${NOT_STUDENT}` : AI_CONNECTION_GUIDANCE.AI_REQUEST_UNVERIFIED;
     root.append(
       textNode('p', `AI 연결 점검 실패(${code})`, { role: 'alert' }),
       textNode('p', message),
@@ -619,21 +622,13 @@ function renderExplanation(input) {
 
   const data = status === 'ok' && explanation.data && typeof explanation.data === 'object' ? explanation.data : null;
   const evidence = Array.isArray(event.evidence) ? event.evidence : [];
-  const rules = Array.isArray(event.rules) ? event.rules : [];
-  const actions = Array.isArray(event.supportedActions) ? event.supportedActions : [];
   const evidenceIds = data && Array.isArray(data.evidenceIds) ? data.evidenceIds : null;
   const evidenceById = new Map(evidence.filter(row => row && typeof row.id === 'string').map(row => [row.id, row]));
   const validEvidence = evidenceIds && evidenceIds.length > 0 && new Set(evidenceIds).size === evidenceIds.length
     && evidenceIds.every(id => typeof id === 'string' && evidenceById.has(id))
     && evidenceIds.length === evidenceById.size;
-  const validProposals = data && Array.isArray(data.proposals) && data.proposals.length <= 3
-    && data.proposals.every(proposal => proposal && typeof proposal === 'object'
-      && typeof proposal.action === 'string' && actions.includes(proposal.action)
-      && typeof proposal.reason === 'string' && Array.isArray(proposal.evidenceIds) && proposal.evidenceIds.length > 0
-      && new Set(proposal.evidenceIds).size === proposal.evidenceIds.length
-      && proposal.evidenceIds.every(id => typeof id === 'string' && evidenceById.has(id)));
   const valid = data && typeof data.summary === 'string' && data.summary.trim() !== ''
-    && validEvidence && validProposals && data.requiresHumanConfirmation === true && data.executed === false;
+    && validEvidence && data.requiresHumanConfirmation === true && data.executed === false;
   if (!valid) {
     root.setAttribute('data-student-state', 'error');
     const rawCode = explanation.error && typeof explanation.error.code === 'string' ? explanation.error.code : 'ON_AI_INVALID_OUTPUT';
@@ -650,41 +645,9 @@ function renderExplanation(input) {
   root.append(textNode('h3', `사건 ${event.id} · AI 설명(참고용)`), textNode('p', data.summary));
   if (typeof view.checkedAt === 'string' && view.checkedAt !== '') root.append(textNode('p', `설명 확인 시각: ${timeText(view.checkedAt)}`));
 
-  root.append(textNode('h4', '인용한 근거'));
-  const evidenceList = textNode('ul', '');
-  for (const id of evidenceIds) evidenceList.append(line(`근거 ${id}`, present(evidenceById.get(id).text, '(내용 없음)')));
-  root.append(evidenceList);
-
-  root.append(textNode('h4', '적용된 규칙'));
-  if (rules.length === 0) root.append(textNode('p', '표시할 규칙이 없습니다.'));
-  else {
-    const ruleList = textNode('ul', '');
-    for (const rule of rules) ruleList.append(line(`규칙 ${present(rule && rule.id, '(id 없음)')}`, present(rule && rule.text, '(내용 없음)')));
-    root.append(ruleList);
-  }
-
-  root.append(textNode('h4', '현재 사건 상태(세 값은 따로 봅니다)'));
-  const currentState = event.state && typeof event.state === 'object' ? event.state : {};
-  const stateList = textNode('ul', '');
-  stateList.append(
-    line('접속(access)', codeLabel(ACCESS_LABELS, currentState.access), currentState.access !== 'allowed'),
-    line('세션(session)', codeLabel(SESSION_LABELS, currentState.session), SESSION_ATTENTION.has(currentState.session) || !Object.hasOwn(SESSION_LABELS, currentState.session)),
-    line('기기(device)', codeLabel(DEVICE_LABELS, currentState.device), DEVICE_ATTENTION.has(currentState.device) || !Object.hasOwn(DEVICE_LABELS, currentState.device)),
-  );
-  root.append(stateList);
-
-  root.append(textNode('h4', 'AI 조치 제안(자동 실행하지 않음)'));
-  if (data.proposals.length === 0) {
-    root.append(textNode('p', actions.length === 0
-      ? '원천이 지원하는 조치가 없어 제안이 없습니다. 조치는 실행되지 않았습니다.'
-      : 'AI가 제안한 조치가 없습니다. 조치는 실행되지 않았습니다.'));
-  } else {
-    const proposalList = textNode('ul', '');
-    for (const proposal of data.proposals) {
-      proposalList.append(line(`조치 ${proposal.action}`, `${proposal.reason} · 근거 ID: ${proposal.evidenceIds.join(', ')}`));
-    }
-    root.append(proposalList, textNode('p', '제안은 참고용입니다. 사람이 확인해야 하며 아직 실행되지 않았습니다.'));
-  }
+  root.append(textNode('p', `인용한 근거 ID: ${evidenceIds.join(', ')}`));
+  // 근거 내용·규칙·조치 제안의 자세한 표시는 18단계에서 넓힙니다.
+  root.append(textNode('p', '설명은 참고용입니다. 조치는 실행되지 않았습니다.'));
   return root;
 }
 
