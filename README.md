@@ -8,7 +8,7 @@
   - `renderAiConnection({ status, mode, data, error, checkedAt, explanationAccepted })`: idle·loading·ok·error 구분, ok 일 때 `audienceAuthorization`(test/verified)·`modelCount`·`checkedAt` 표시와 "사건 설명은 아직 실행하지 않았습니다" 안내, 오류 코드별 원인 안내(`AI_CONNECTION_GUIDANCE`), 취소·시간 초과 구분, 재점검·idle 시 이전 결과 제거, 자동 재시도 없음.
   - `renderExplanation({ event, explanation, checkedAt })`: 성공일 때만 `data-student-explanation-event` 에 사건 ID 를 붙이고 요약을 글자로 표시, 실패면 안전한 code·message 와 "기록은 그대로" 안내.
   - 모든 표시는 `createElement`·`textContent` 만 쓰고, 오류 메시지는 `safeValue` 로 열쇠·토큰 모양을 가립니다.
-- 시험: `test/on-client/ai-connection.test.mjs` 등 38건 통과(`node --test test/on-client/*.test.mjs`, 0.2.14 업데이트 뒤 다시 실행).
+- 시험: `main` 의 `test/on-client/ai-connection.test.mjs` 등 38건 통과(`node --test test/on-client/*.test.mjs`, 0.2.14 업데이트 뒤 다시 실행). 판정 원문 분량 때문에 이 제출본에는 시험 파일을 넣지 않았습니다.
 
 ## 요청 연결 경로(제공 코드, 수정하지 않음)
 
