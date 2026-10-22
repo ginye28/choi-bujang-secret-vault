@@ -17,6 +17,67 @@
 3. `on-client/src/ai/service.mjs` 의 `createOnAiService`: 모델 목록 점검과 사건 설명(`activeClient.chat(...)`)을 실제로 보내는 곳입니다. `vault-service.mjs` 는 이 서비스를 계정 연결 보관소로 감싼 것입니다(이 제출본에서는 크기 때문에 뺐고 `main` 에 있습니다).
 4. 사건 설명은 보안 기록의 사건에서 따로 요청하며(`aiRequest('/api/ai/explain', { eventId })`), 결과는 `renderExplanation` 으로 표시합니다. 모델 목록 응답만으로 사건 설명 성공으로 표시하지 않습니다.
 
+## 제공 `public/app.js` 원문 발췌(0.2.14, 수정 없음)
+
+판정 원문 분량 안에 `src/server.mjs` 가 들어가도록 이 제출본에서는 `public/app.js`(1,372줄)를 뺐습니다. 학생 표시와 이어지는 부분만 줄 번호와 함께 그대로 옮깁니다. 전체 파일은 `main`(`ef8453c`)의 `on-client/public/app.js` 입니다.
+
+연결 점검·취소·초기화(463~485행):
+
+```js
+function cancelAiCheck({ reset = false } = {}) {
+  ++aiConnectionGeneration;
+  if (aiConnectionController) aiConnectionController.abort();
+  aiConnectionController = null;
+  state.aiConnection = reset ? { status: 'idle' } : safeAiFailure({ error: { code: 'CANCELLED' } });
+  renderAiConnection();
+}
+
+async function checkAiConnection() {
+  const gen = generation, requestGen = ++aiConnectionGeneration;
+  if (aiConnectionController) aiConnectionController.abort();
+  const controller = new AbortController();
+  aiConnectionController = controller;
+  state.aiConnection = { status: 'loading' };
+  renderAiConnection();
+  try {
+    const result = await aiRequest('/api/ai/check', { body: {}, signal: controller.signal });
+    if (gen !== generation || requestGen !== aiConnectionGeneration) return;
+    const data = result.ok ? validAiCheck(result.data, result.meta) : null;
+    state.aiConnection = data ? { status: 'ok', data, meta: result.meta } : safeAiFailure(result.ok ? null : result);
+    renderAiConnection();
+  } finally { controller.abort(); if (aiConnectionController === controller) aiConnectionController = null; }
+}
+```
+
+계정 연결이 바뀌면 점검 결과를 idle 로 되돌림(563~568행):
+
+```js
+function invalidateAppConnectView() {
+  if ((aiConnect && aiConnect.state.phase !== 'idle') || state.aiConnection.status !== 'idle') appConnectInvalidated = true;
+  if (aiConnect) aiConnect.reset();
+  cancelAiCheck({ reset: true });
+  renderAiConnect();
+}
+```
+
+보안 기록에서 사건 설명 요청(999~1018행 일부):
+
+```js
+    const result = safeEvent ? await aiRequest('/api/ai/explain', { body: { eventId: event.id }, signal: controller.signal })
+      : localFailure('ON_AI_INVALID_INPUT', AI_MESSAGES.ON_AI_INVALID_INPUT, UNKNOWN_META);
+    // 다시 불러오기 이후이거나 기록 칸이 바뀌었으면 늦은 응답은 버린다.
+    if (gen !== generation || requestGen !== explanationGeneration || explainSlots.get(event.id) !== slot) return;
+    // AI 결과는 기록 목록 상태와 분리한다. 실패해도 기록은 그대로 둔다.
+    if (!result.ok) {
+      state.selectedExplanation.resource = safeAiFailure(result);
+      ...
+    }
+    const explanation = validExplanation(result.data, event);
+    ...
+    state.selectedExplanation.resource = { status: 'ok', data: explanation, meta: result.meta };
+    setChildren(slot, renderExplanation(explanation, event, result.meta));
+```
+
 ## 실제 연결 기록(사실대로)
 
 - 2026-10-22: 시작 틀 0.2.14 로 업데이트하고 `tools/start-alekov.ps1` 로 앱을 켰습니다(계정 연결 설정 자동 준비 완료).
