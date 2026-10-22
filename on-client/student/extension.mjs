@@ -1,13 +1,7 @@
-// 이 파일은 학생이 같은 프로젝트에서 이어서 구현합니다.
-// 제공 UI를 받은 것만으로 단계 완료를 인정하지 않습니다.
 
-// ── 13단계: 로그인 사용자·기기·세션 표시 ─────────────────────────────────────
-// 화면 문장은 지금 상태를 읽는 사람이 틀리지 않게 전하는 것이 기준입니다.
-// 값은 textContent 로만 넣습니다(innerHTML 은 쓰지 않습니다). 색이 아니라 글자로도 상태를 구분합니다.
 const DEVICE_LABELS = Object.freeze({ compliant: '보안 기준 충족', noncompliant: '보안 기준 미충족', unknown: '확인 불가' });
 const SESSION_LABELS = Object.freeze({ active: '활성', expired: '만료', revoked: '철회됨', unknown: '확인 불가' });
 const MODE_NOTICES = Object.freeze({ demo: '예제 자료(demo): 실제 연결이 아닙니다.', disconnected: '연결 없음(disconnected)', unknown: '확인 불가(unknown): 연결 상태를 확인할 수 없습니다.' });
-// 정상처럼 보이면 안 되는 값: 화면에 "주의"를 글자로 덧붙입니다.
 const DEVICE_ATTENTION = new Set(['noncompliant', 'unknown']);
 const SESSION_ATTENTION = new Set(['expired', 'revoked', 'unknown']);
 
@@ -18,7 +12,6 @@ function textNode(tag, text, attrs = {}) {
   return node;
 }
 
-// 서버가 준 코드를 한국어 뜻과 원래 값으로 함께 보여 줍니다. 목록에 없는 값은 확인 불가로 읽습니다.
 function codeLabel(labels, value) {
   return Object.hasOwn(labels, value) ? `${labels[value]}(${value})` : `확인 불가(${String(value)})`;
 }
@@ -31,19 +24,16 @@ function stateOf(resource) {
   return resource && ['loading', 'ok', 'error'].includes(resource.status) ? resource.status : 'unknown';
 }
 
-// 자료 하나(me·devices·sessions)의 제목 줄과 상태 안내. loading·error 에서도 mode 안내를 함께 보입니다.
 function section(title, resource, key, own = false) {
   const box = textNode('section', '', { 'aria-label': title, 'data-student-section': key, 'data-student-state': stateOf(resource) });
   box.append(textNode('h3', title));
   const mode = modeOf(resource);
-  // 아직 요청하지 않은(idle) 자료에는 연결 상태가 없으므로 연결 안내를 붙이지 않습니다.
   if (mode !== 'connected' && !(resource && resource.status === 'idle')) box.append(textNode('p', MODE_NOTICES[mode], { 'data-student-mode': mode }));
   const state = stateOf(resource);
   if (state === 'loading') box.append(textNode('p', '불러오는 중'));
   else if (own && (state === 'error' || state === 'unknown')) { /* 호출한 화면이 직접 안내합니다 */ }
   else if (state === 'error') {
     const message = resource.error && typeof resource.error.message === 'string' && resource.error.message ? resource.error.message : '서버가 오류 내용을 알려 주지 않았습니다.';
-    // 연결에 실패했거나 확인할 수 없는 상태입니다. 이전에 보이던 사용자·기기·세션 값은 여기에 남기지 않습니다.
     box.append(textNode('p', `연결 실패: ${message}`, { role: 'alert' }));
     box.append(textNode('p', '값을 확인할 수 없습니다(확인 불가). 정상이라는 뜻이 아닙니다.'));
   } else if (state === 'unknown') box.append(textNode('p', '확인 불가: 응답 형식을 읽을 수 없습니다.'));
@@ -115,9 +105,6 @@ function renderIdentity(input) {
   return root;
 }
 
-// ── 14단계: 업무 앱 접속 판정 표시 ───────────────────────────────────────────
-// 서버가 돌려준 판정(allow·deny·challenge·unknown)과 요청 실패를 서로 다르게 보여 줍니다.
-// 판정은 한국어 뜻과 원래 값을 함께 적고, 확인할 수 없는 값은 허용처럼 읽히지 않게 확인 불가로 둡니다.
 const DECISION_INFO = Object.freeze({
   allow: { label: '접근 허용', note: '정책상 접근이 허용됐다는 뜻입니다. 실제 앱 접속 성공을 보장하지 않습니다.' },
   deny: { label: '접근 거부', note: '접근이 허용되지 않았습니다.' },
@@ -129,7 +116,6 @@ function decisionBox(state, extra = {}) {
   return textNode('div', '', { 'data-student-decision': 'true', 'data-student-state': state, ...extra });
 }
 
-// 요청한 앱과 서버가 판정한 앱이 같은지 확인합니다. 다르면 다른 앱의 판정을 이 앱의 결과로 보이지 않게 합니다.
 function appMatches(requestedAppId, data) {
   return typeof requestedAppId !== 'string' || requestedAppId === '' || data.appId === requestedAppId;
 }
@@ -140,7 +126,6 @@ function renderDecision(input) {
   const appId = typeof view.appId === 'string' && view.appId !== '' ? view.appId : null;
   const box = decisionBox(state);
   const mode = modeOf(view);
-  // idle 은 아직 요청 전이라 연결 상태가 없습니다. 요청한 뒤(loading·ok·error)에는 demo·disconnected·unknown 안내를 함께 보입니다.
   if (state !== 'idle' && mode !== 'connected') box.append(textNode('p', MODE_NOTICES[mode], { 'data-student-mode': mode }));
 
   if (state === 'idle') {
@@ -153,7 +138,6 @@ function renderDecision(input) {
   }
   if (state === 'error') {
     const message = view.error && typeof view.error.message === 'string' && view.error.message ? view.error.message : '서버가 오류 내용을 알려 주지 않았습니다.';
-    // 요청 실패는 거부 판정이 아닙니다. 이전 판정 값은 남기지 않습니다.
     box.append(
       textNode('p', `요청 실패: ${message}`, { role: 'alert' }),
       textNode('p', '이것은 접근 거부 판정이 아니라 판정을 받지 못한 것입니다. 접근이 허용되지도 않았습니다(확인 불가).'),
@@ -184,9 +168,6 @@ function renderDecision(input) {
   return box;
 }
 
-// ── 15단계: 내 접속 기록과 XDR 경보 ──────────────────────────────────────────
-// 받은 기록 배열 안에서만 걸러 보고(서버에 다시 묻지 않음), 행마다 상세를 엽니다.
-// 새 자료가 오면 renderEvents 가 새 요소를 만들어 돌려주므로 이전 목록·상세·걸러 보기 상태는 남지 않습니다.
 const KIND_LABELS = Object.freeze({ access: '접속', xdr: 'XDR 경보' });
 const ACCESS_LABELS = Object.freeze({ allowed: '허용됨', denied: '거부됨', unknown: '확인 불가' });
 const NO_APP = '__none__'; // appId 가 없는 옛 기록을 고르는 값
@@ -195,7 +176,6 @@ function appText(appId) {
   return typeof appId === 'string' && appId !== '' ? appId : '앱을 확인할 수 없음(appId 없음)';
 }
 
-// 시각은 서버가 준 원래 값과 한국 시각을 함께 적습니다. 읽을 수 없는 시각은 그대로 두고 확인 불가라고 알립니다.
 function timeText(at) {
   const ms = Date.parse(at);
   if (!Number.isFinite(ms)) return `${String(at)} (시각을 읽을 수 없음)`;
@@ -207,7 +187,6 @@ function kindText(kind) {
   return Object.hasOwn(KIND_LABELS, kind) ? `${KIND_LABELS[kind]}(${kind})` : `확인 불가(${String(kind)})`;
 }
 
-// 종류 선택지는 접속·XDR 경보 순으로 두고, 모르는 종류는 그 뒤에 이름순으로 둡니다.
 function kindsPresent(events) {
   const present_ = [...new Set(events.map(e => e.kind))];
   const known = Object.keys(KIND_LABELS).filter(k => present_.includes(k));
@@ -264,8 +243,6 @@ function detailView(event) {
     line('기기 상태(device)', codeLabel(DEVICE_LABELS, state.device), DEVICE_ATTENTION.has(state.device) || !Object.hasOwn(DEVICE_LABELS, state.device)),
   );
   detail.append(states);
-  // 16단계: 서버가 자동 확인이 연결되지 않은 조치를 넘겨 줄 때만, 요청을 보내지 않는 비활성 안내 버튼을 둡니다.
-  // 지금 실제 목록은 supportedActions 가 비어 있어 버튼이 없습니다. 이 버튼은 어떤 요청도 보내지 않습니다.
   const actions = Array.isArray(event.supportedActions) ? event.supportedActions.filter(a => typeof a === 'string' && a !== '') : [];
   if (actions.length > 0) {
     detail.append(textNode('h5', '조치'));
@@ -291,7 +268,6 @@ function renderEvents(input) {
   if (state === 'error') {
     const message = view.error && typeof view.error.message === 'string' && view.error.message ? view.error.message : '서버가 오류 내용을 알려 주지 않았습니다.';
     const code = view.error && typeof view.error.code === 'string' ? view.error.code : '';
-    // 실패는 빈 목록이 아닙니다. 이전 목록과 상세는 남기지 않습니다.
     root.append(textNode('p', `기록을 불러오지 못했습니다: ${message}`, { role: 'alert' }));
     root.append(textNode('p', (code === 'CONTRACT_MISMATCH' || code === 'ENGINE_RESULT_UNVERIFIED')
       ? '확인 불가: 서버 응답 형식을 확인할 수 없어 기록을 표시하지 않습니다. 기록이 없다는 뜻이 아닙니다.'
@@ -346,7 +322,6 @@ function renderEvents(input) {
       row.append(button);
       list.append(row);
     }
-    // 걸러서 사라진 행의 상세는 남기지 않습니다.
     if (openId !== null && !shown.some(e => e.id === openId)) { detailSlot.textContent = ''; openId = null; }
   }
 
@@ -356,12 +331,8 @@ function renderEvents(input) {
   return root;
 }
 
-// ── 16단계: 알림·기기·세션·연결 점검·오류·빈 화면 ────────────────────────────
-// 실패·빈 화면·불러오는 중을 서로 다르게 보이고, 다시 시도는 사용자가 위쪽 다시 불러오기 버튼을 직접 누를 때만 일어납니다.
-// 이 함수는 어떤 요청도 보내지 않고 자동으로 다시 시도하지 않습니다. 도움정보에는 비밀값이 들어가지 않습니다.
 const SECRET_PATTERN = /(?:Bearer\s+\S+|sk-(?:proj-|ant-|svcacct-)?[A-Za-z0-9_-]{8,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:api[_ -]?key|authorization|password|secret|token|비밀번호|토큰|열쇠)\s*[:=]\s*\S+)/giu;
 
-// 화면과 복사 내용에 쓰는 값: 비밀로 보이는 부분은 가리고 길이를 제한합니다.
 function safeValue(value, max = 200) {
   if (value === null || value === undefined) return '(없음)';
   const text = String(value).replace(SECRET_PATTERN, '[가림]');
@@ -376,7 +347,6 @@ function isTimeout(error) {
 
 const RETRY_GUIDE = '다시 시도는 위쪽 다시 불러오기 버튼을 직접 누르세요. 자동으로 다시 요청하지 않습니다.';
 
-// 자료 하나(기기·세션)의 불러오는 중·실패·빈 목록·목록을 서로 다른 문장으로 그립니다.
 function statusSection(title, key, resource, emptyText, describe) {
   const box = section(title, resource, key, true); // mode 안내·불러오는 중은 13단계 도구를 그대로 쓰고, 실패 안내는 이 화면에서 씁니다.
   const state = stateOf(resource);
@@ -407,7 +377,6 @@ function notificationsSection(notifications) {
   return box;
 }
 
-// 비밀 없는 연결 점검 값만 고릅니다.
 function diagnosticsFields(data) {
   const d = data && typeof data === 'object' ? data : {};
   const engine = d.engine && typeof d.engine === 'object' ? d.engine : {};
@@ -438,7 +407,6 @@ function diagnosticsSection(diagnostics) {
   return box;
 }
 
-// 도움 요청에 붙여 넣을 안전한 요약. 사용자가 버튼을 누를 때만 만듭니다.
 function helpText(input) {
   const part = (resource, describe) => {
     const state = stateOf(resource);
@@ -491,39 +459,45 @@ function renderStatus(input) {
   return root;
 }
 
+// 여러 코드가 같은 안내를 쓰는 경우 문장을 한 번만 둡니다.
+const ASK = '담당자에게 확인하세요.';
+const NOT_STUDENT = '학생 잘못이 아닙니다. 담당자에게 계정 권한, native 호스트 설정, 수업용 AI 게이트 반영 여부를 확인해 달라고 요청하세요.';
+const TIMEOUT_GUIDE = 'AI 응답 시간이 초과됐습니다. 연결 상태를 확인한 뒤 필요하면 직접 다시 점검하세요.';
+const CANCEL_GUIDE = 'AI 점검을 취소했습니다. 이전 결과는 현재 점검 결과가 아닙니다.';
+const FORMAT_GUIDE = `AI 서버 응답 형식을 확인할 수 없습니다. ${ASK}`;
 const AI_CONNECTION_GUIDANCE = Object.freeze({
-  ON_AI_PROVISIONING_PENDING: '학생 앱 전용 AI 권한·연결 준비가 아직 끝나지 않았습니다. 담당자에게 확인하세요.',
+  ON_AI_PROVISIONING_PENDING: `학생 앱 전용 AI 권한·연결 준비가 아직 끝나지 않았습니다. ${ASK}`,
   WB_CLCO_AUTH_REQUIRED: '앱 전용 이용 인증을 확인할 수 없습니다. Workbench 열쇠를 복사하지 말고 담당자에게 확인하세요.',
-  WB_CLCO_ACCESS_BLOCKED: '학생 앱의 AI 이용 권한이 허용되지 않았습니다. 담당자에게 확인하세요.',
+  WB_CLCO_ACCESS_BLOCKED: `학생 앱의 AI 이용 권한이 허용되지 않았습니다. ${ASK}`,
   SUBJECT_SCOPE_UNVERIFIED: '현재 로그인과 프로젝트 범위를 확인할 수 없습니다. 계정 연결을 확인하고 담당자에게 문의하세요.',
   ON_AI_AUTHORIZATION_CHANGED: '점검 중 AI 이용 권한이 바뀌었습니다. 담당자에게 현재 권한을 확인하세요.',
   WB_CLCO_SESSION_CLOSED: '현재는 AI 이용 시간이 아닙니다. 이용 시간을 확인하세요.',
-  WB_CLCO_COHORT_BUDGET_EXHAUSTED: '반의 AI 사용량이 소진됐습니다. 담당자에게 확인하세요.',
+  WB_CLCO_COHORT_BUDGET_EXHAUSTED: `반의 AI 사용량이 소진됐습니다. ${ASK}`,
   WB_CLCO_RATE_LIMITED: 'AI 요청이 잠시 제한됐습니다. 잠시 기다린 뒤 직접 다시 점검하세요.',
-  WB_CLCO_LIMIT_REACHED: 'AI 이용 한도에 도달했습니다. 담당자에게 확인하세요.',
-  WB_CLCO_TIMEOUT: 'AI 응답 시간이 초과됐습니다. 연결 상태를 확인한 뒤 필요하면 직접 다시 점검하세요.',
+  WB_CLCO_LIMIT_REACHED: `AI 이용 한도에 도달했습니다. ${ASK}`,
+  WB_CLCO_TIMEOUT: TIMEOUT_GUIDE,
+  TIMEOUT: TIMEOUT_GUIDE,
   REQUEST_TIMEOUT: '서버의 AI 응답 시간이 초과됐습니다. 필요하면 직접 다시 점검하세요.',
   ENGINE_TIMEOUT: '서버의 확인 시간이 초과됐습니다. 필요하면 직접 다시 점검하세요.',
-  TIMEOUT: 'AI 응답 시간이 초과됐습니다. 연결 상태를 확인한 뒤 필요하면 직접 다시 점검하세요.',
   WB_CLCO_SERVER_UNAVAILABLE: 'AI 서버가 응답하지 않습니다. 연결을 확인하고 필요하면 직접 다시 점검하세요.',
   WB_CLCO_NETWORK_ERROR: 'AI 서버에 연결할 수 없습니다. 네트워크 상태를 확인하고 필요하면 직접 다시 점검하세요.',
-  WB_CLCO_CANCELLED: 'AI 점검을 취소했습니다. 이전 결과는 현재 점검 결과가 아닙니다.',
-  CANCELLED: 'AI 점검을 취소했습니다. 이전 결과는 현재 점검 결과가 아닙니다.',
-  REQUEST_CANCELLED: 'AI 점검을 취소했습니다. 이전 결과는 현재 점검 결과가 아닙니다.',
+  WB_CLCO_CANCELLED: CANCEL_GUIDE,
+  CANCELLED: CANCEL_GUIDE,
+  REQUEST_CANCELLED: CANCEL_GUIDE,
   MODEL_NOT_CONFIGURED: '앱 서버의 AI 모델 설정을 확인해야 합니다. 담당자에게 문의하세요.',
   ON_AI_MODEL_LIST_EMPTY: '현재 앱 권한으로 사용할 수 있는 모델이 없습니다. 담당자에게 모델 허용 설정을 확인하세요.',
   ON_AI_INVALID_INPUT: 'AI 점검 요청 형식을 확인할 수 없습니다. 새로고침한 뒤 직접 다시 점검하세요.',
-  ON_AI_INVALID_OUTPUT: 'AI 점검 응답 형식을 확인할 수 없습니다. 담당자에게 확인하세요.',
-  WB_CLCO_INVALID_RESPONSE: 'AI 서버 응답 형식을 확인할 수 없습니다. 담당자에게 확인하세요.',
-  WB_CLCO_INVALID_CONTENT_TYPE: 'AI 서버 응답 형식을 확인할 수 없습니다. 담당자에게 확인하세요.',
-  WB_CLCO_RESPONSE_TOO_LARGE: 'AI 서버 응답이 너무 큽니다. 담당자에게 확인하세요.',
+  ON_AI_INVALID_OUTPUT: `AI 점검 응답 형식을 확인할 수 없습니다. ${ASK}`,
+  WB_CLCO_INVALID_RESPONSE: FORMAT_GUIDE,
+  WB_CLCO_INVALID_CONTENT_TYPE: FORMAT_GUIDE,
+  WB_CLCO_RESPONSE_TOO_LARGE: `AI 서버 응답이 너무 큽니다. ${ASK}`,
   WB_CLCO_REDIRECT_BLOCKED: 'AI 서버 주소가 다른 곳으로 이동했습니다. 담당자에게 설정을 확인하세요.',
   WB_CLCO_INVALID_URL: 'AI 서버 주소 설정을 확인해야 합니다. 담당자에게 문의하세요.',
   WB_CLCO_INVALID_TOKEN: '앱 전용 인증 설정을 확인해야 합니다. 열쇠를 복사하지 말고 담당자에게 문의하세요.',
   WB_CLCO_INVALID_LIMIT: 'AI 요청 제한 시간 설정을 확인해야 합니다. 담당자에게 문의하세요.',
-  WB_CLCO_REQUEST_FAILED: 'AI 요청을 처리하지 못했습니다. 담당자에게 확인하세요.',
-  NATIVE_HOST_DISABLED: '학생 잘못이 아닙니다. 담당자에게 계정 권한, native 호스트 설정, 수업용 AI 게이트 반영 여부를 확인해 달라고 요청하세요.',
-  AI_REQUEST_UNVERIFIED: '실제 모델 목록과 사건 설명 호출은 아직 확인되지 않았습니다. 학생 잘못이 아닙니다. 담당자에게 계정 권한, native 호스트 설정, 수업용 AI 게이트 반영 여부를 확인해 달라고 요청하세요.',
+  WB_CLCO_REQUEST_FAILED: `AI 요청을 처리하지 못했습니다. ${ASK}`,
+  NATIVE_HOST_DISABLED: NOT_STUDENT,
+  AI_REQUEST_UNVERIFIED: `실제 모델 목록과 사건 설명 호출은 아직 확인되지 않았습니다. ${NOT_STUDENT}`,
 });
 
 function renderAiConnection(input) {
@@ -547,11 +521,8 @@ function renderAiConnection(input) {
     const code = safeValue(rawCode || 'AI_REQUEST_UNVERIFIED', 80);
     const message = view.error && typeof view.error.message === 'string' && view.error.message
       ? safeValue(view.error.message) : '서버가 안전한 오류 내용을 제공하지 않았습니다.';
-    const guidance = knownCode
-      ? AI_CONNECTION_GUIDANCE[rawCode]
-      : rawCode
-        ? '확인 불가: 학생 잘못이 아닙니다. 담당자에게 계정 권한·native 호스트 설정·수업용 AI 게이트 반영 여부를 확인해 달라고 요청하세요.'
-        : AI_CONNECTION_GUIDANCE.AI_REQUEST_UNVERIFIED;
+    const guidance = knownCode ? AI_CONNECTION_GUIDANCE[rawCode]
+      : rawCode ? `확인 불가: ${NOT_STUDENT}` : AI_CONNECTION_GUIDANCE.AI_REQUEST_UNVERIFIED;
     root.append(
       textNode('p', `AI 연결 점검 실패(${code})`, { role: 'alert' }),
       textNode('p', message),
@@ -619,21 +590,13 @@ function renderExplanation(input) {
 
   const data = status === 'ok' && explanation.data && typeof explanation.data === 'object' ? explanation.data : null;
   const evidence = Array.isArray(event.evidence) ? event.evidence : [];
-  const rules = Array.isArray(event.rules) ? event.rules : [];
-  const actions = Array.isArray(event.supportedActions) ? event.supportedActions : [];
   const evidenceIds = data && Array.isArray(data.evidenceIds) ? data.evidenceIds : null;
   const evidenceById = new Map(evidence.filter(row => row && typeof row.id === 'string').map(row => [row.id, row]));
   const validEvidence = evidenceIds && evidenceIds.length > 0 && new Set(evidenceIds).size === evidenceIds.length
     && evidenceIds.every(id => typeof id === 'string' && evidenceById.has(id))
     && evidenceIds.length === evidenceById.size;
-  const validProposals = data && Array.isArray(data.proposals) && data.proposals.length <= 3
-    && data.proposals.every(proposal => proposal && typeof proposal === 'object'
-      && typeof proposal.action === 'string' && actions.includes(proposal.action)
-      && typeof proposal.reason === 'string' && Array.isArray(proposal.evidenceIds) && proposal.evidenceIds.length > 0
-      && new Set(proposal.evidenceIds).size === proposal.evidenceIds.length
-      && proposal.evidenceIds.every(id => typeof id === 'string' && evidenceById.has(id)));
   const valid = data && typeof data.summary === 'string' && data.summary.trim() !== ''
-    && validEvidence && validProposals && data.requiresHumanConfirmation === true && data.executed === false;
+    && validEvidence && data.requiresHumanConfirmation === true && data.executed === false;
   if (!valid) {
     root.setAttribute('data-student-state', 'error');
     const rawCode = explanation.error && typeof explanation.error.code === 'string' ? explanation.error.code : 'ON_AI_INVALID_OUTPUT';
@@ -650,41 +613,9 @@ function renderExplanation(input) {
   root.append(textNode('h3', `사건 ${event.id} · AI 설명(참고용)`), textNode('p', data.summary));
   if (typeof view.checkedAt === 'string' && view.checkedAt !== '') root.append(textNode('p', `설명 확인 시각: ${timeText(view.checkedAt)}`));
 
-  root.append(textNode('h4', '인용한 근거'));
-  const evidenceList = textNode('ul', '');
-  for (const id of evidenceIds) evidenceList.append(line(`근거 ${id}`, present(evidenceById.get(id).text, '(내용 없음)')));
-  root.append(evidenceList);
-
-  root.append(textNode('h4', '적용된 규칙'));
-  if (rules.length === 0) root.append(textNode('p', '표시할 규칙이 없습니다.'));
-  else {
-    const ruleList = textNode('ul', '');
-    for (const rule of rules) ruleList.append(line(`규칙 ${present(rule && rule.id, '(id 없음)')}`, present(rule && rule.text, '(내용 없음)')));
-    root.append(ruleList);
-  }
-
-  root.append(textNode('h4', '현재 사건 상태(세 값은 따로 봅니다)'));
-  const currentState = event.state && typeof event.state === 'object' ? event.state : {};
-  const stateList = textNode('ul', '');
-  stateList.append(
-    line('접속(access)', codeLabel(ACCESS_LABELS, currentState.access), currentState.access !== 'allowed'),
-    line('세션(session)', codeLabel(SESSION_LABELS, currentState.session), SESSION_ATTENTION.has(currentState.session) || !Object.hasOwn(SESSION_LABELS, currentState.session)),
-    line('기기(device)', codeLabel(DEVICE_LABELS, currentState.device), DEVICE_ATTENTION.has(currentState.device) || !Object.hasOwn(DEVICE_LABELS, currentState.device)),
-  );
-  root.append(stateList);
-
-  root.append(textNode('h4', 'AI 조치 제안(자동 실행하지 않음)'));
-  if (data.proposals.length === 0) {
-    root.append(textNode('p', actions.length === 0
-      ? '원천이 지원하는 조치가 없어 제안이 없습니다. 조치는 실행되지 않았습니다.'
-      : 'AI가 제안한 조치가 없습니다. 조치는 실행되지 않았습니다.'));
-  } else {
-    const proposalList = textNode('ul', '');
-    for (const proposal of data.proposals) {
-      proposalList.append(line(`조치 ${proposal.action}`, `${proposal.reason} · 근거 ID: ${proposal.evidenceIds.join(', ')}`));
-    }
-    root.append(proposalList, textNode('p', '제안은 참고용입니다. 사람이 확인해야 하며 아직 실행되지 않았습니다.'));
-  }
+  root.append(textNode('p', `인용한 근거 ID: ${evidenceIds.join(', ')}`));
+  // 근거 내용·규칙·조치 제안의 자세한 표시는 18단계에서 넓힙니다.
+  root.append(textNode('p', '설명은 참고용입니다. 조치는 실행되지 않았습니다.'));
   return root;
 }
 
