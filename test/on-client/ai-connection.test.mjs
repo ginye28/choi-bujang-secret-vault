@@ -89,11 +89,42 @@ test('renderExplanation: 성공일 때만 사건 표시를 붙이고 실패·근
   const okExplanation = { status: 'ok', data: { summary: '반복 로그인 실패 뒤 성공', evidenceIds: ['e1'], proposals: [], requiresHumanConfirmation: true, executed: false } };
   const ok = view.renderExplanation({ event, explanation: okExplanation, checkedAt: '2026-10-19T00:00:00Z' });
   assert.equal(ok.getAttribute('data-student-explanation-event'), 'evt-7');
-  for (const want of ['evt-7', '반복 로그인 실패 뒤 성공', 'e1', '실행되지 않았습니다']) assert.ok(ok.textContent.includes(want), want);
+  for (const want of ['evt-7', 'AI 설명(참고용)', '반복 로그인 실패 뒤 성공', '근거 e1 — 근거 글', '규칙 r1 — 규칙 글', '접속: 확인 불가(unknown)', '제안이 없습니다(정상)']) assert.ok(ok.textContent.includes(want), want);
+  assert.ok(!ok.textContent.includes('세션: 확인 불가'), 'active 세션은 확인 불가로 적지 않는다');
   const failed = view.renderExplanation({ event, explanation: { status: 'error', error: { code: 'WB_CLCO_TIMEOUT', message: '시간 초과' } }, checkedAt: '2026-10-19T00:00:00Z' });
   assert.equal(failed.getAttribute('data-student-explanation-event'), null);
   assert.ok(failed.textContent.includes('WB_CLCO_TIMEOUT') && failed.textContent.includes('그대로'));
   const mismatch = view.renderExplanation({ event, explanation: { status: 'ok', data: { ...okExplanation.data, evidenceIds: ['nope'] } }, checkedAt: '2026-10-19T00:00:00Z' });
   assert.equal(mismatch.getAttribute('data-student-explanation-event'), null);
   assert.equal(view.renderExplanation({ event: null, explanation: okExplanation, checkedAt: 'x' }).getAttribute('data-student-explanation-event'), null);
+});
+
+test('renderExplanation 18단계: 오류는 event 가 없어도 먼저 보이고, 실행됐다는 설명·근거 불일치는 쓰지 않는다', () => {
+  const event = { id: 'evt-9', evidence: [{ id: 'e1', text: '근거 글' }, { id: 'e2', text: '두 번째 근거' }], rules: [], supportedActions: ['lock_device'], state: { access: 'allowed', session: 'unknown', device: 'unknown' } };
+  const data = { summary: '요약', evidenceIds: ['e1', 'e2'], proposals: [], requiresHumanConfirmation: true, executed: false };
+
+  const noEventError = view.renderExplanation({ event: null, explanation: { status: 'error', error: { code: 'ON_AI_PROVISIONING_PENDING', message: '권한 준비 중' } } });
+  assert.ok(noEventError.textContent.includes('ON_AI_PROVISIONING_PENDING') && noEventError.textContent.includes('그대로'));
+  assert.ok(!noEventError.textContent.includes('먼저 고르세요'));
+  assert.ok(view.renderExplanation({ event: null, explanation: { status: 'idle' } }).textContent.includes('먼저 고르세요'));
+  assert.ok(view.renderExplanation({ event, explanation: { status: 'loading' } }).textContent.includes('요청 중'));
+
+  const ok = view.renderExplanation({ event, explanation: { status: 'ok', data } });
+  assert.equal(ok.getAttribute('data-student-explanation-event'), 'evt-9');
+  for (const want of ['세션: 확인 불가(unknown)', '기기: 확인 불가(unknown)', 'AI가 제안한 조치가 없습니다', '표시할 규칙이 없습니다']) assert.ok(ok.textContent.includes(want), want);
+  assert.ok(!ok.textContent.includes('접속: 확인 불가'));
+
+  const withProposal = view.renderExplanation({ event, explanation: { status: 'ok', data: { ...data, proposals: [{ action: 'lock_device', reason: '이상 접속', evidenceIds: ['e1'] }] } } });
+  assert.ok(withProposal.textContent.includes('lock_device') && withProposal.textContent.includes('실행되지 않았습니다'));
+  assert.equal(withProposal.find(n => n.tag === 'button').length, 0, '실행 버튼을 만들지 않는다');
+
+  for (const bad of [{ ...data, executed: true }, { ...data, evidenceIds: ['e1'] }, { ...data, evidenceIds: ['e1', 'zz'] }]) {
+    const node = view.renderExplanation({ event, explanation: { status: 'ok', data: bad } });
+    assert.equal(node.getAttribute('data-student-explanation-event'), null);
+    assert.ok(node.textContent.includes('사용할 수 없습니다') && node.textContent.includes('그대로'));
+    assert.ok(!node.textContent.includes('요약'));
+  }
+  // 다른 기록의 설명(근거 ID 가 이 기록 것이 아님)은 붙이지 않는다.
+  const other = view.renderExplanation({ event: { ...event, id: 'evt-10', evidence: [{ id: 'x1', text: '다른 기록' }] }, explanation: { status: 'ok', data } });
+  assert.equal(other.getAttribute('data-student-explanation-event'), null);
 });
