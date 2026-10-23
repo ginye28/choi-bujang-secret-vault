@@ -800,6 +800,156 @@ function renderExplanation(input) {
   return root;
 }
 
+function renderAction(input) {
+  const view = input && typeof input === 'object' ? input : {};
+  const allowedStatuses = ['idle', 'loading', 'executing', 'prepared', 'pending', 'succeeded', 'denied', 'failed', 'unknown', 'error', 'expired'];
+  const status = allowedStatuses.includes(view.status) ? view.status : 'unknown';
+  const event = view.event && typeof view.event === 'object' ? view.event : null;
+  const target = view.target && typeof view.target === 'object' ? view.target : null;
+  const receipt = view.receipt && typeof view.receipt === 'object' ? view.receipt : null;
+  const observation = view.observation && typeof view.observation === 'object' ? view.observation : null;
+  const root = textNode('div', '');
+  const hasValue = value => value !== null && value !== undefined && value !== '';
+  const valueText = (value, fallback = '(없음)', max = 160) => {
+    if (!hasValue(value)) return fallback;
+    if (!['string', 'number', 'boolean'].includes(typeof value)) return '(형식 확인 불가)';
+    return present(safeValue(value, max), fallback);
+  };
+  const dateText = value => {
+    if (typeof value !== 'string' || value === '') return valueText(value, '(받지 않음)');
+    return timeText(safeValue(value, 160));
+  };
+  const addField = (list, label, value, force = false, format = valueText) => {
+    if (!force && !hasValue(value)) return;
+    list.append(line(label, format(value, force ? '(받지 않음)' : '(없음)')));
+  };
+
+  const eventIsValid = validEvent(event);
+  const actionIdIsValid = typeof view.actionId === 'string' && view.actionId !== '';
+  const receiptEventIdIsValid = receipt && typeof receipt.eventId === 'string' && receipt.eventId !== '';
+  const receiptActionIdIsValid = receipt && typeof receipt.actionId === 'string' && receipt.actionId !== '';
+  const bindingComplete = eventIsValid && actionIdIsValid && receiptEventIdIsValid && receiptActionIdIsValid;
+  const bindingMatches = bindingComplete
+    && receipt.eventId === event.id
+    && receipt.actionId === view.actionId;
+  const bindingProblem = !eventIsValid
+    ? '현재 사건 ID를 확인할 수 없어 결과를 현재 사건에 연결할 수 없습니다.'
+    : !actionIdIsValid
+      ? '현재 actionId를 확인할 수 없어 결과를 현재 조치에 연결할 수 없습니다.'
+      : !receiptEventIdIsValid || !receiptActionIdIsValid
+        ? '접수 응답의 eventId 또는 actionId가 없어 현재 사건·조치와 결과를 연결할 수 없습니다.'
+        : !bindingMatches
+          ? '접수 응답의 eventId 또는 actionId가 현재 사건·조치와 다릅니다.'
+          : '';
+  const effectConfirmed = status === 'succeeded'
+    && observation !== null
+    && observation.effectApplied === true
+    && bindingMatches;
+
+  if (eventIsValid) root.setAttribute('data-student-action-event', event.id);
+  if (receipt && typeof receipt.requestId === 'string' && receipt.requestId !== '') {
+    root.setAttribute('data-student-action-request', receipt.requestId);
+  }
+
+  root.append(
+    textNode('h3', '보안 조치 요청 상태와 실제 결과'),
+    textNode('p', 'AI 제안, 사람 확인, 서버 접수(ACK), 실제 효과 관측은 서로 다른 단계입니다.'),
+    textNode('p', '이 칸은 서버가 알려 준 상태만 표시하며 조치를 직접 요청하거나 실행하지 않습니다.'),
+  );
+
+  if (status === 'idle') {
+    root.append(textNode('p', '아직 미실행(idle). 조치 요청을 하지 않았습니다.'));
+    root.append(textNode('p', '연동 시스템이 지원하는 조치가 없는 기록(supportedActions 빈 배열)에는 조치 준비 버튼이 나오지 않으며, 이것이 정상입니다.'));
+  } else if (status === 'loading') {
+    root.append(textNode('p', '조치 준비 또는 결과 조회 중(loading). 서버 접수나 효과는 아직 확인되지 않았습니다.'));
+  } else if (status === 'prepared') {
+    root.append(textNode('p', '준비됨·미실행(prepared). 준비 상태는 사람 확인이나 조치 실행을 뜻하지 않습니다.'));
+    root.append(textNode('p', '사람이 실제 대상과 조치를 직접 확인하고 제공 화면의 「대상과 조치를 확인했으며 집행합니다」를 눌러야 서버에 전달됩니다. 확인 기한이 지나면 다시 준비해야 합니다.'));
+  } else if (status === 'executing') {
+    root.append(textNode('p', '서버에 전달 중(executing). 결과가 아직 확인되지 않았습니다. 완료 아님.'));
+    root.append(textNode('p', '같은 조치를 다시 집행하지 마세요. 결과는 「연동 시스템 결과만 재조회」로 확인합니다.'));
+  } else if (status === 'pending') {
+    root.append(textNode('p', '서버 접수·처리 중(pending). ACK는 실제 효과가 아니며 결과가 아직 확인되지 않았습니다. 완료 아님.'));
+    root.append(textNode('p', '같은 조치를 다시 집행하지 마세요. 결과는 「연동 시스템 결과만 재조회」로 확인합니다.'));
+  } else if (status === 'succeeded' && effectConfirmed) {
+    root.append(textNode('p', '효과 확인(succeeded). 현재 사건·조치에 연결된 서버 응답에서 실제 효과를 관측했습니다.'));
+  } else if (status === 'succeeded') {
+    root.append(textNode('p', '결과 불명(unknown). 효과를 확인할 수 없어 성공이나 효과 없음으로 판단하지 않습니다.'));
+    root.append(textNode('p', bindingProblem || 'observation.effectApplied가 true가 아니므로 효과 확인 조건을 충족하지 않았습니다.'));
+    root.append(textNode('p', '제공 화면의 「연동 시스템 결과만 재조회」로 결과만 다시 조회하세요. 조치를 다시 요청하지 마세요.'));
+  } else if (status === 'denied') {
+    root.append(textNode('p', '연동 시스템에서 거절(denied)했습니다.'));
+    if (hasValue(view.message)) root.append(textNode('p', `메시지: ${valueText(view.message)}`));
+  } else if (status === 'failed') {
+    root.append(textNode('p', '연동 시스템에서 실패(failed)했습니다.'));
+    if (hasValue(view.message)) root.append(textNode('p', `메시지: ${valueText(view.message)}`));
+  } else if (status === 'unknown') {
+    root.append(textNode('p', '결과 불명(unknown). 성공이나 효과 없음으로 판단하지 않습니다.'));
+    root.append(textNode('p', '제공 화면의 「연동 시스템 결과만 재조회」로 결과만 다시 조회하세요. 조치를 다시 요청하지 마세요.'));
+  } else if (status === 'error') {
+    const error = view.error && typeof view.error === 'object' ? view.error : {};
+    root.append(textNode('p', '요청이 처리되지 않았습니다(error).', { role: 'alert' }));
+    if (hasValue(error.code)) root.append(textNode('p', `오류 코드: ${valueText(error.code, '(없음)', 80)}`));
+    root.append(textNode('p', `오류 메시지: ${valueText(error.message, '서버가 오류 메시지를 제공하지 않았습니다.')}`));
+  } else if (status === 'expired') {
+    root.append(textNode('p', '확인 기한이 지났습니다(expired). 제공 화면에서 다시 준비해야 합니다. 이 함수는 조치를 준비하거나 요청하지 않습니다.'));
+  }
+
+  if (!eventIsValid) root.append(textNode('p', '현재 사건 ID를 확인할 수 없습니다.'));
+  if (view.status !== status) root.append(textNode('p', `받은 status: ${valueText(view.status, '(없음)', 80)}`));
+
+  const details = textNode('ul', '');
+  if (eventIsValid) addField(details, '사건 ID', event.id);
+  if (event && Array.isArray(event.evidence)) {
+    const evidenceIds = event.evidence
+      .filter(row => row && typeof row === 'object' && hasValue(row.id))
+      .map(row => valueText(row.id));
+    details.append(line('근거 ID', evidenceIds.length > 0 ? evidenceIds.join(', ') : '(없음)'));
+  } else if (status === 'prepared') {
+    details.append(line('근거 ID', '(받지 않음)'));
+  }
+  addField(details, 'actionId', view.actionId, status === 'prepared');
+  if (target) {
+    addField(details, '실제 대상 ID(target.id)', target.id, status === 'prepared');
+    addField(details, '대상 generation', target.generation, status === 'prepared');
+  } else if (status === 'prepared') {
+    details.append(line('실제 대상 ID(target.id)', '(대상 없음/null)'));
+    details.append(line('대상 generation', '(대상 없음/null)'));
+  }
+  if (hasValue(view.confirmationExpiresAt) || status === 'prepared') {
+    details.append(line('확인 기한', dateText(view.confirmationExpiresAt)));
+  }
+  if (receipt) {
+    addField(details, 'receipt.eventId', receipt.eventId);
+    addField(details, 'receipt.actionId', receipt.actionId);
+    addField(details, 'requestId', receipt.requestId);
+    addField(details, 'receiptId', receipt.receiptId, status === 'succeeded');
+    addField(details, 'receipt.status(효과 판정 아님)', receipt.status);
+    addField(details, 'receipt.version', receipt.version);
+    addField(details, 'receipt.replayed', receipt.replayed);
+  } else if (status === 'succeeded') {
+    details.append(line('receiptId', '(받지 않음)'));
+  }
+  if (status === 'succeeded') {
+    details.append(line('관측 시각', observation ? dateText(observation.observedAt) : '(관측 정보 없음)'));
+    details.append(line(
+      'observation.effectApplied',
+      effectConfirmed ? 'true' : valueText(observation && observation.effectApplied, '(받지 않음)'),
+    ));
+  }
+  if (details.children.length > 0) {
+    root.append(textNode('h4', '현재 입력에서 확인할 수 있는 ID와 상태'), details);
+  }
+  if (receipt && receipt.replayed === true) {
+    root.append(textNode('p', 'replayed: true — 이미 접수된 같은 요청에 대한 재응답이며 새 집행이 아닙니다.'));
+  }
+  if (status === 'prepared' && hasValue(view.confirmationExpiresAt)) {
+    root.append(textNode('p', `사람 확인 기한: ${dateText(view.confirmationExpiresAt)}`));
+  }
+
+  return root;
+}
+
 export function createStudentView() {
   return {
     renderIdentity,
@@ -809,6 +959,6 @@ export function createStudentView() {
     renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
     renderAiConnection,
     renderExplanation,
-    renderAction() { return '학생 구현 대기: 현재 사건·조치·실제 대상·사람 확인·ACK와 원천 효과·unknown을 구분하세요.'; },
+    renderAction,
   };
 }
