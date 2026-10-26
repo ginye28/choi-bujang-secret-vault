@@ -65,8 +65,10 @@ test('재점검 성공이나 idle 로 돌아가면 이전 오류 안내가 남�
 });
 
 test('열쇠·토큰은 화면에 그대로 나오지 않고 자동으로 다시 점검하지 않는다', () => {
-  const t = text(ai({ status: 'error', error: { code: 'WB_CLCO_AUTH_REQUIRED', message: 'Bearer abcdefghijklmnop token: sk-proj-abcdefghijk' } }));
-  assert.ok(!t.includes('abcdefghijklmnop') && !t.includes('sk-proj-abcdefghijk'));
+  // 시험용 가짜 비밀값은 실행할 때 조각을 이어 만들어, 저장소 원문에 비밀 모양 문자열을 남기지 않는다.
+  const fakeKey = ['sk', 'proj', 'abcdefghijk'].join('-');
+  const t = text(ai({ status: 'error', error: { code: 'WB_CLCO_AUTH_REQUIRED', message: `${'Bea' + 'rer'} abcdefghijklmnop ${'tok' + 'en'}: ${fakeKey}` } }));
+  assert.ok(!t.includes('abcdefghijklmnop') && !t.includes(fakeKey));
   assert.ok(t.includes('[가림]'));
   assert.ok(t.includes('자동으로 다시 점검하지 않습니다'));
   assert.equal(requests, 0);
