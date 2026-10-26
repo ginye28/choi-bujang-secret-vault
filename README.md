@@ -3,33 +3,48 @@
 이 저장소의 `on-client/` 는 ALEPH 5차 방어전에서 만든 로컬 보안 Agent 「케셰브」입니다. 실행 방법·구성도·확인 기록의 자세한 내용은 [on-client/docs/STUDENT_RUNBOOK.md](on-client/docs/STUDENT_RUNBOOK.md) 에 있습니다.
 
 - **목적**: 내 PC의 브라우저 화면에서 로그인·기기·세션 상태, 업무 앱 접근 판정, 접속 기록과 XDR 경보, 연결 점검, AI 설명·조치 상태, 설치 패키지 취약점 조회 결과를 확인 불가·실패와 구분해 보여 줍니다.
-- **기능(학생 작성, `on-client/student/extension.mjs`)**: `renderIdentity`(13), `renderDecision`(14), `renderEvents`(15), `renderStatus`(16), `renderAiConnection`(17), `renderExplanation`(17·18), `renderAction`(19), `renderVulnerabilities`(20). 그 밖의 `on-client/public/`, `src/`, `tools/`, `vendor/` 는 제공 코드(시작 틀 0.2.14)이며 수정하지 않았습니다.
+- **기능(학생 작성, `on-client/student/extension.mjs`)**: `renderIdentity`(13), `renderDecision`(14), `renderEvents`(15), `renderStatus`(16, 마지막 총공세에 위험 알림 추가), `renderAiConnection`(17), `renderExplanation`(17·18), `renderAction`(19), `renderVulnerabilities`(20). 그 밖의 `on-client/public/`, `src/`, `tools/`, `vendor/` 는 제공 코드(시작 틀 0.2.14)이며 수정하지 않았습니다.
 - **구성**: 브라우저(`public/index.html`·`public/app.js`·`student/extension.mjs`) → 로컬 앱 서버 `src/server.mjs`(127.0.0.1:5189) → 접근 제어·XDR 시스템(SDP 연동 엔진, `-SdpHostConfig` 지정 시) / 수업용 AI 게이트(`src/connection/native-login.mjs`·`src/ai/`) / OSV(`src/vulnerabilities/`) / 조치(`src/actions/`).
 - **지원 환경과 버전(확인함, 2026-10-23)**: Windows 11 Pro, Windows PowerShell 5.1, Node.js v24.19.0(시작 도구는 22~24 허용, 24.19.0 권장), Git 2.55. 외부 npm 의존성이 없어 `npm install` 과 `package-lock.json` 이 필요 없습니다.
-- **실행 요약**: `on-client` 폴더에서 PowerShell 을 열고 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1` → 「케셰브가 켜졌습니다. 브라우저에서 http://127.0.0.1:5189/ 을 여세요.」가 보이면 그 주소를 엽니다. 종료는 Ctrl+C. 시험은 저장소 최상위에서 `node --test test/on-client/*.test.mjs`(46개 통과, 모의 DOM).
+- **실행 요약**: `on-client` 폴더에서 PowerShell 을 열고 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1` → 「케셰브가 켜졌습니다. 브라우저에서 http://127.0.0.1:5189/ 을 여세요.」가 보이면 그 주소를 엽니다. 종료는 Ctrl+C. 시험은 저장소 최상위에서 `node --test test/on-client/*.test.mjs`(53개 통과, 모의 DOM, 2026-10-26).
 - **미확인**: 계정 연결 확인에서 게이트가 401 `ON_APP_NATIVE_SESSION_UNVERIFIED` 를 돌려줘 AI 앱 승인·실제 사건 설명·실제 조치 집행·SDP 연결은 확인하지 못했습니다. 이 항목들을 성공으로 적지 않습니다.
+
+
+## 마지막 총공세 진행 상황 (2026-10-26 기준)
+
+작전: 화면 틀 **관제 대시보드형**, 포장 **기본 포장**. 핵심 기능: 보안 기록 보기·AI 설명 / 업무 앱 접속 판정·상태 / 설치 패키지 취약점 + 위험 알림.
+
+| 일차 | 상태 | 기록 |
+|---|---|---|
+| 1일차 실행 확인·핵심 기능 정하기 | 완료(위험 알림 추가 포함) | [FINISH_NOTES.md](on-client/docs/FINISH_NOTES.md) |
+| 2·3일차 내 PC 상태(CPU·메모리·디스크, 네트워크·방화벽·Windows 기록) | **준비 대기** — 시작 틀 0.2.14 에 제공 「내 PC 상태」가 없음 | FINISH_NOTES |
+| 4일차 화면 정리·`appearance.json` | **준비 대기** | FINISH_NOTES |
+| 5일차 처음 보는 사람용 안내 | 완료 | [QUICKSTART.md](on-client/docs/QUICKSTART.md) |
+| 6일차 `npm run package-app -- … --finish-materials` | **준비 대기** — 명령 없음 | FINISH_NOTES |
+| 7일차 시연 안내·완성 기록 | 완료 | [FINISH_DEMO.md](on-client/docs/FINISH_DEMO.md), [COMPLETION_RECORD.md](on-client/docs/COMPLETION_RECORD.md) |
+
+- 최종 제출(네 파일 + 앱 화면)은 아직 하지 않았습니다. 제공 파일 업데이트 뒤 포장해서 제출합니다.
+- 브랜치: `main`(전체 작업), `keshev-final`(실행 가능한 최종본, 22단계 통과 `af79fc9`), `submit-17-22`(17~21단계 제출본).
 
 ---
 
-# 방어전 케셰브 — 보안 Agent 13~22단계 (진행 중)
+# 방어전 케셰브 — 보안 Agent 13~22단계 (완료)
 
-공식 4~6차 트랙입니다. `on-client/` 가 시작 틀(0.2.11)이고, 학생이 고치는 파일은 `on-client/student/extension.mjs` 하나입니다. 제공 파일(`public/`, `src/`, `vendor/`, `tools/`)은 고치지 않았고 원본 해시와 같습니다.
+| 단계 | 구현 | 서버 판정 |
+|---|---|---|
+| 13 | `renderIdentity` | 통과 |
+| 14 | `renderDecision` | 통과 |
+| 15 | `renderEvents` | 통과 |
+| 16 | `renderStatus` | 통과 |
+| 17 | `renderAiConnection` + `renderExplanation` | 통과 |
+| 18 | `renderExplanation` 보완 | 통과 |
+| 19 | `renderAction` | 통과 |
+| 20 | `renderVulnerabilities` | 통과 |
+| 21 | `STUDENT_RUNBOOK.md` + README 요약 | 통과 |
+| 22 | `keshev-final` 새 폴더 재현(`REPRODUCTION.md`) | 통과(22단계 완주, 4~6차 10/10) |
 
-| 단계 | 구현 | 커밋 | 서버 판정 |
-|---|---|---|---|
-| 13 | `renderIdentity` | `253f267` | 통과 |
-| 14 | `renderDecision` | `873f005` | 통과 |
-| 15 | `renderEvents` | `caf58b0` | 통과 |
-| 16 | `renderStatus` + 15단계 상세의 미지원 조치 안내 | `ee2de7c` | 통과 |
-| 17 | `renderAiConnection`(점검 전·중·ok·오류 구분, 연결만 점검한 상태와 사건 설명 구분) + `renderExplanation` | `49e667e`(제출용 브랜치 `submit-17-22` `bf43a43`) | 표시 구현 7/9 충족. `ai_transport_checked`·`ai_model_called` 는 실제 AI 연결(계정 연결·승인) 확인 전이라 확인 불가 |
-| 18~20 | 미구현 | — | — |
-| 21~22 | 미구현 — 반에 아직 공개되지 않음 | — | — |
-
-- 실행: `cd on-client && npm run demo`(예제 자료) 또는 `npm start`(연결 없음 상태) 후 http://127.0.0.1:5189 . 구문 확인은 `npm run check`.
-- 모의 자료 시험: `node --test test/on-client/*.test.mjs`(37개). AI 판정과 별개이며 실제 연결 성취가 아닙니다.
-- 제출: 방어전 화면 `https://aleph-omega.vercel.app/defense?tab=alekov` 에서 저장소 주소와 커밋 40자리를 냅니다. 단계마다 그 단계 함수만 고치고 커밋·푸시합니다.
-- **실제 AI 연결 상태(2026-10-19)**: `tools/prepare-native-host.ps1 -ProjectRoot <프로젝트> -HostRoot <프로젝트 밖 새 폴더> -Create` 로 `native.json` 을 만들고 `node src/server.mjs --native-host-config <경로>` 로 켜면 `NATIVE_HOST_DISABLED` 가 사라집니다. 이후 수업용 AI 게이트(`ai-classroom-gateway-production`)의 `/api/apps/aleph-on/*`(native-login·connect·v1) 경로가 404 라 계정 연결이 `NATIVE_HOST_UNVERIFIED` 로 멈춥니다. 게이트에 해당 경로가 반영되면 계정 연결 → AI 연결 승인 → 「현재 API 연결 점검」을 이어서 합니다.
-- 비밀값(열쇠·토큰·`.env`)은 저장소에 넣지 않습니다. 17단계의 AI 연결 승인은 본인 계정으로 포털에서 직접 해야 합니다.
+- 학생 코드는 모의 DOM 시험(`test/on-client`)으로 확인했습니다. 18단계 이후 학생 코드와 총공세 문서는 Workbench 수업용 AI 로 작성했습니다. 제공 파일(`public/`, `src/`, `vendor/`, `tools/`)은 고치지 않았습니다.
+- 비밀값(열쇠·토큰·`.env`)은 저장소에 넣지 않습니다.
 
 ---
 
