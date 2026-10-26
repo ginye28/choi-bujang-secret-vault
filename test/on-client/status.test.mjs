@@ -66,8 +66,10 @@ test('연결 점검: 전·불러오는 중·실패·성공이 다르고, 성공 
 });
 
 test('비밀로 보이는 값은 화면과 복사 내용에서 가려진다', async () => {
-  const secret = 'Bearer abcdefghijklmnop1234';
-  const input = base({ notifications: [{ resource: 'devices', code: 'X', message: `토큰 token=abc123 ${secret}` }], diagnostics: ok({ requestId: 'sk-ant-abcdefghijklmnop', component: 'c', version: 'v', checkedAt: 'now', engine: { mode: 'm', code: 'password=hunter2' } }) });
+  // 시험용 가짜 비밀값은 실행할 때 조각을 이어 만들어, 저장소 원문에 비밀 모양 문자열을 남기지 않는다.
+  const join = (...parts) => parts.join('');
+  const fakeBearer = join('Bea', 'rer ', 'abcdefghijklmnop', '1234');
+  const input = base({ notifications: [{ resource: 'devices', code: 'X', message: `토큰 ${join('tok', 'en=', 'abc123')} ${fakeBearer}` }], diagnostics: ok({ requestId: join('sk', '-ant-', 'abcdefghijklmnop'), component: 'c', version: 'v', checkedAt: 'now', engine: { mode: 'm', code: join('pass', 'word=', 'hunter2') } }) });
   const root = view.renderStatus(input);
   for (const leaked of ['abc123', 'abcdefghijklmnop', 'hunter2']) assert.ok(!root.textContent.includes(leaked), leaked);
   const [button] = root.byName('도움정보 복사');
