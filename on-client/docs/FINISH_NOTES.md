@@ -73,3 +73,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Ba
 - 시연 순서·한계·근거는 `on-client/docs/FINISH_DEMO.md`, 완성 기록틀(1~8)은 `on-client/docs/COMPLETION_RECORD.md`에 적었습니다(Workbench 수업용 AI 작성, 경로·명령 표기와 시험 재실행 결과만 검토 때 고침).
 - 11:16:26 `node --test test/on-client/*.test.mjs` 다시 실행: 46개 통과·실패 0.
 - 포장(6일차)이 준비 대기라 최종 제출 자료(네 파일·앱 화면)는 아직 만들지 않았고 **최종 제출은 미실시**입니다.
+
+## 1일차 보완 — 핵심 기능 「위험 알림」 추가 (2026-10-26 17:30 KST)
+
+- `student/extension.mjs` 에 `riskAlertSection` 을 추가해 학생 상태 칸 맨 위에 「위험 알림」을 보입니다(Workbench 수업용 AI 작성, 빈 값 거르기만 검토 때 고침). 제공 파일은 고치지 않았습니다.
+- 등급: 「높음」(기기 `noncompliant`, `xdr` 경보) · 「확인 필요」(그 밖의 모든 알림과 처음 보는 코드). 연결·조회가 확인된 경우에만 「지금 확인된 위험 알림이 없습니다」라고 쓰고, 연결 없음·예제에서는 위험이 없다는 뜻이 아니라고 적습니다.
+- 시험 `test/on-client/risk-alert.test.mjs` 7개 추가 → 전체 53개 통과.
+
+| 화면 | 확인한 내용 |
+|---|---|
+| 실제 모드(5189) | `높음 0건 · 확인 필요 5건` — me·apps·events·devices·sessions 모두 `ENGINE_NOT_CONNECTED`, `연결 없음(disconnected)` |
+| 예제 모드(5190) | `높음 0건 · 확인 필요 2건` — 기기 `unknown`, 기록 `event-01` · 「예제 자료로 만든 알림입니다. 실제 위험 판정이 아닙니다.」 |
+
+1일차 점검표: 기록 보기 — 화면 됨(실제 연결 미확인) · 내 PC 상태 — 아직 안 됨(2·3일차 제공 업데이트 필요) · 위험 알림 — 됨(실제 모드는 연결 실패를 「확인 필요」로 표시, 예제 모드에서 알림 확인).

@@ -456,12 +456,79 @@ function helpText(input) {
   return lines.join('\n');
 }
 
+// 마지막 총공세: 상태 칸 맨 위의 위험 알림 요약(높음·확인 필요). Workbench 작성.
+function riskAlertSection(view) {
+  const input = view && typeof view === 'object' ? view : {};
+  const mode = modeOf(input);
+  const box = textNode('section', '', {
+    'aria-label': '위험 알림',
+    'data-student-section': 'risk',
+  });
+  box.append(textNode('h3', '위험 알림'));
+
+  const showModeNotice = () => {
+    if (mode !== 'connected' && MODE_NOTICES[mode]) {
+      box.append(textNode('p', MODE_NOTICES[mode], { 'data-student-mode': mode }));
+    }
+    if (mode === 'demo') {
+      box.append(textNode('p', '예제 자료로 만든 알림입니다. 실제 위험 판정이 아닙니다.'));
+    }
+  };
+
+  if (!Array.isArray(input.notifications)) {
+    box.append(textNode('p', '확인 불가: 알림 목록을 읽을 수 없습니다. 위험이 없다는 뜻이 아닙니다.'));
+    showModeNotice();
+    return box;
+  }
+
+  const notifications = input.notifications.filter(item => item && typeof item === 'object');
+  const high = notifications.filter(item => (item.code === 'noncompliant' || item.code === 'xdr'));
+  const needsReview = notifications.filter(item => !high.includes(item));
+
+  const summary = textNode('p', `높음 ${high.length}건 · 확인 필요 ${needsReview.length}건`);
+  if (high.length > 0) summary.setAttribute('role', 'alert');
+  box.append(summary);
+
+  if (notifications.length === 0) {
+    const noRiskConfirmed = mode === 'connected'
+      && stateOf(input.devices) === 'ok'
+      && stateOf(input.sessions) === 'ok';
+    if (noRiskConfirmed) {
+      box.append(textNode('p', '지금 확인된 위험 알림이 없습니다.'));
+    } else {
+      box.append(textNode('p', '확인된 위험 알림 0건 — 연결·조회가 확인되지 않아 위험이 없다는 뜻이 아닙니다.'));
+      if (mode !== 'connected' && MODE_NOTICES[mode]) {
+        box.append(textNode('p', MODE_NOTICES[mode], { 'data-student-mode': mode }));
+      }
+    }
+    if (mode === 'demo') {
+      box.append(textNode('p', '예제 자료로 만든 알림입니다. 실제 위험 판정이 아닙니다.'));
+    }
+    return box;
+  }
+
+  const list = textNode('ul', '');
+  for (const [grade, items] of [['높음', high], ['확인 필요', needsReview]]) {
+    for (const item of items) {
+      list.append(line(
+        `[${grade}] 자료: ${safeValue(item.resource, 40)} · 코드: ${safeValue(item.code, 60)}`,
+        safeValue(item.message),
+        true,
+      ));
+    }
+  }
+  box.append(list);
+  showModeNotice();
+  return box;
+}
+
 function renderStatus(input) {
   const view = input && typeof input === 'object' ? input : {};
   const root = textNode('div', '', { 'data-student-status': 'true' });
   const mode = modeOf(view);
   if (mode !== 'connected') root.append(textNode('p', MODE_NOTICES[mode], { 'data-student-mode': mode }));
   root.append(
+    riskAlertSection(view),
     statusSection('기기', 'devices', view.devices, '등록된 기기가 없습니다.', d => line(
       `${present(d.label, present(d.id))} (id: ${present(d.id)})`, codeLabel(DEVICE_LABELS, d.status),
       DEVICE_ATTENTION.has(d.status) || !Object.hasOwn(DEVICE_LABELS, d.status))),
