@@ -1,6 +1,10 @@
 # 케셰브 (5차 방어전 13~22단계 보안 Agent)
 
-이 저장소의 `on-client/` 는 ALEPH 5차 방어전에서 만든 로컬 보안 Agent 「케셰브」입니다. 실행 방법·구성도·확인 기록의 자세한 내용은 [on-client/docs/STUDENT_RUNBOOK.md](on-client/docs/STUDENT_RUNBOOK.md) 에 있습니다.
+이 브랜치(`keshev-final`)의 `on-client/` 는 ALEPH 5차 방어전에서 만든 로컬 보안 Agent 「케셰브」입니다. 버전은 **케셰브 학생판 0.9.0-rc.1(검증 중, v1.0 아님)**, 시작 틀은 `alekov-client-starter` 0.2.14 입니다.
+
+- 실행 방법·구성도·확인 기록(21단계): [on-client/docs/STUDENT_RUNBOOK.md](on-client/docs/STUDENT_RUNBOOK.md)
+- 새 폴더 재현 기록·릴리스 기록·데이터 보존 계획(22단계): [REPRODUCTION.md](REPRODUCTION.md)
+- 다른 PC로 옮길 때: 이 브랜치를 새 빈 폴더에 `git clone` 하고 위 실행 설명서를 따릅니다. 설치할 npm 패키지가 없고 `.env` 도 필요 없습니다. 계정 연결 설정은 실행 도구가 그 PC의 사용자 폴더에 새로 만들며, 다른 PC의 설정·자격 정보를 복사하지 않습니다.
 
 - **목적**: 내 PC의 브라우저 화면에서 로그인·기기·세션 상태, 업무 앱 접근 판정, 접속 기록과 XDR 경보, 연결 점검, AI 설명·조치 상태, 설치 패키지 취약점 조회 결과를 확인 불가·실패와 구분해 보여 줍니다.
 - **기능(학생 작성, `on-client/student/extension.mjs`)**: `renderIdentity`(13), `renderDecision`(14), `renderEvents`(15), `renderStatus`(16), `renderAiConnection`(17), `renderExplanation`(17·18), `renderAction`(19), `renderVulnerabilities`(20). 그 밖의 `on-client/public/`, `src/`, `tools/`, `vendor/` 는 제공 코드(시작 틀 0.2.14)이며 수정하지 않았습니다.
