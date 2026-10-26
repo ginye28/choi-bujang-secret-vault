@@ -67,3 +67,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Ba
 - 원인: 두 곳 모두 **안내** 문제였고 코드 문제는 아니었습니다.
 - 보완: Workbench 수업용 AI 가 `on-client/docs/QUICKSTART.md` 만 고침 — 시작 신호를 실제 다섯 줄로 바꾸고 "앱을 쓰는 동안 이 창은 열어 둡니다" 추가, 예제는 "새 PowerShell 창을 하나 더 열고 같은 위치에서 실행"으로 수정.
 - 보완 뒤 내가 다시 따라 한 결과(11:10:31~40, 같은 폴더를 `git pull` 로 `00375f9` 에 맞춤): 첫 창 출력 다섯 줄이 안내와 같고, 두 번째 창의 예제(5190)도 응답 200. 다른 사람이 보완 뒤 다시 따라 한 결과: **미실시**.
+
+## 7일차 — 2026-10-26 11:16 KST
+
+- 시연 순서·한계·근거는 `on-client/docs/FINISH_DEMO.md`, 완성 기록틀(1~8)은 `on-client/docs/COMPLETION_RECORD.md`에 적었습니다(Workbench 수업용 AI 작성, 경로·명령 표기와 시험 재실행 결과만 검토 때 고침).
+- 11:16:26 `node --test test/on-client/*.test.mjs` 다시 실행: 46개 통과·실패 0.
+- 포장(6일차)이 준비 대기라 최종 제출 자료(네 파일·앱 화면)는 아직 만들지 않았고 **최종 제출은 미실시**입니다.
