@@ -53,7 +53,7 @@
 | 다시 실행한 명령 | **확인함(실행 기록):** 2026-10-26 11:00~11:10 실제 모드와 예제 모드 실행을 확인했다고 기록됨. 안내 명령: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1`; 예제는 새 PowerShell 창에서 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Demo -Port 5190`. 11:07 기본 실행, 11:08 예제 실행, 11:08:12~37 끄고 다시 켜기, 11:10 보완 뒤 따라 하기가 기록됨. |
 | 다시 실행한 시각 | **확인함(기록):** 2026-10-26 11:00~11:10. 새 폴더 안내 재현은 11:07~11:08, 보완 뒤 다시 따라 하기는 11:10:31~40. |
 | 다시 실행한 결과 | **확인함(기록):** 실제 화면은 연결 없음 상태. 새 폴더 기본 실행 및 예제 실행에서 응답 200, 기본 화면 보호 현황·연결 없음·학생 칸 8개·콘솔 오류 없음으로 기록됨. 예제 머리말도 기록됨. 2026-10-26 11:16:26 `keshev-final` 폴더에서 `node --test test/on-client/*.test.mjs` 다시 실행: 46개 통과·실패 0(Node.js v24.19.0, 모의 DOM). 이번 문서 작성 때 앱 화면 재실행은 **미실시**. |
-| 포장 명령·패키지 산출 | **확인함:** `package.json`에 `package-app` 명령이 없고 `npm run package-app -- … --finish-materials`도 현재 시작 틀에 없음. 포장 실행 및 바로가기 생성은 **미실시**. `APP_PACKAGE_MANIFEST.json` 및 `source.git.head`는 **미확인**. |
+| 포장 명령·패키지 산출 | **확인함:** 마무리 제출은 GitHub 저장소 주소와 커밋 번호만 받으므로 포장은 필수가 아님(2026-10-27 방어전 안내). `package.json`에 `package-app` 명령이 없고 `npm run package-app -- … --finish-materials`도 현재 시작 틀에 없음. 포장 실행 및 바로가기 생성은 **미실시**. `APP_PACKAGE_MANIFEST.json` 및 `source.git.head`는 **미확인**. |
 
 ## 5. 처음 사용한 사람이 막힌 곳
 
@@ -74,7 +74,7 @@
 ## 8. 남은 한계와 다음에 확인할 것
 
 - **확인함 — 남은 한계:** 계정 연결·AI 앱 승인·실제 사건 설명은 확인 불가(`401 ON_APP_NATIVE_SESSION_UNVERIFIED`); SDP 접근 제어·XDR 실제 연결은 설정 없음으로 연결 없음; 19단계 실제 조치는 미준비; OSV 실제 조회는 허용 목록 없음.
-- **확인함 — 준비 대기:** 2·3일차 제공 「내 PC 상태」와 `student/appearance.json` 지원이 준비되지 않음. 6일차 `npm run package-app --finish-materials` 명령이 시작 틀에 없음.
+- **확인함 — 2·3·4일차 진행(2026-10-27):** 제공 「내 PC 상태」가 없어 학생 측정 도구 `on-client/student/pc-status.mjs`(일반 권한·읽기 전용)로 CPU·메모리·디스크·네트워크·방화벽·Windows 기록을 실제로 재고, 앱 화면 칸에는 넣지 않았다. 4일차는 위험 알림에 「다시 조회」·대기 표시·실패 화면을 붙였다(`appearance.json` 은 지원되지 않아 미사용). 6일차 포장은 명령이 없고 마무리 제출에 필요 없어 건너뛰었다(미실시). 자세한 기록은 `on-client/docs/FINISH_NOTES.md`.
 - **미확인:** 실행 패키지 경로, `APP_PACKAGE_MANIFEST.json`, `source.git.head`, 최종 소스와 패키지가 같은 커밋에서 나왔는지.
 - **확인함:** 담당자 도움 요청 날짜는 아직 없고 요청 전이다. 다음으로 연결·승인 제공 여부와 포장 도구 제공 여부를 담당자에게 확인할 필요가 있다. 도움 요청은 아직 **미실시**.
 - **제안 시연 순서:** 실제 모드의 연결 없음과 학생 칸 8개 → 예제 모드의 기록 걸러 보기·상세·AI 설명 요청(권한 준비 중 표시) → 두 업무 앱 `allow`·`deny` 예시 판정 → 패키지 `not_configured`와 “취약점 없음 아님” 안내 → 미연결·확인 불가·포장 미실시 한계 설명. 예제 값은 실제 조회가 아닌 설명용 값으로 표시한다.
