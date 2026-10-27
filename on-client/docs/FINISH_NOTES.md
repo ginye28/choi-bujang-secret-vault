@@ -124,3 +124,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -Ba
 - 같은 결과를 다시 확인하는 순서: `on-client`에서 앱을 실행하고 `http://127.0.0.1:5189/`의 학생 상태 칸에서 「다시 조회」를 누른다. 예제는 새 PowerShell 창에서 `-Demo -Port 5190`으로 실행한 뒤 같은 버튼을 누른다. 저장소 최상위에서 전체 시험을 다시 실행할 때는 `node --test test/on-client/*.test.mjs`를 사용한다.
 
 6일차 포장(package-app)은 이 시작 틀에 명령이 없고, 마무리 제출은 GitHub 저장소 주소와 커밋 번호만 받으므로 건너뛰었다(포장 미실시).
+
+## 마무리 제출용 앱 화면 (2026-10-27 10:12 KST)
+
+`on-client/docs/screens/` — ① `1-keshev-real-overview.jpg` 실제 모드 첫 화면(연결 없음) ② `2-keshev-real-risk-refresh.jpg` 실제 모드 위험 알림·다시 조회(실패 3건과 다음에 할 일) ③ `3-keshev-demo-risk-refresh.jpg` 예제 모드 위험 알림·다시 조회(성공 3건, 예제 자료 표시) ④ `4-keshev-demo-events.jpg` 예제 모드 보안 기록. 예제 화면 값은 실제 조회가 아닙니다. 로그인 정보·개인 정보는 들어 있지 않습니다.
