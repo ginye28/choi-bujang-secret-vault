@@ -456,6 +456,121 @@ function helpText(input) {
   return lines.join('\n');
 }
 
+// 마지막 총공세 4일차: 위험 알림의 다시 조회·대기 표시·실패 화면. Workbench 작성.
+let studentApi = null;
+let notifyChange = () => {};
+let riskRefresh = { status: 'idle', results: [] };
+
+function connectStudentRuntime(options) {
+  if (!options || typeof options !== 'object') return;
+  if (options.api && typeof options.api.get === 'function') studentApi = options.api;
+  if (typeof options.onChange === 'function') notifyChange = options.onChange;
+}
+
+const REFRESH_TARGETS = [
+  ['/api/devices', '기기 목록'],
+  ['/api/sessions', '세션 정보'],
+  ['/api/events', '보안 기록'],
+];
+
+function nextActionFor(code) {
+  if (code === 'NETWORK_ERROR') return '앱 서버 PowerShell 창이 켜져 있는지 확인한 뒤 다시 조회를 누르세요.';
+  if (code === 'TIMEOUT' || code === 'REQUEST_TIMEOUT') return '잠시 기다린 뒤 다시 조회를 누르세요.';
+  if (code === 'ENGINE_NOT_CONNECTED') return '접근 제어·XDR 연결 설정이 없습니다. on-client/docs/CONNECTION_TROUBLESHOOT.md 의 연결 확인 순서를 따르세요.';
+  if (code === 'CANCELLED') return '조회가 취소됐습니다. 필요하면 다시 조회를 누르세요.';
+  return '오류 코드를 도움정보 복사와 함께 담당자에게 알려 주세요.';
+}
+
+async function refreshRisk() {
+  if (riskRefresh.status === 'loading') return;
+  if (!studentApi || typeof studentApi.get !== 'function') {
+    riskRefresh = { status: 'unavailable', results: [] };
+    notifyChange();
+    return;
+  }
+
+  riskRefresh = { status: 'loading', results: [] };
+  notifyChange();
+  const results = [];
+  for (const [path, label] of REFRESH_TARGETS) {
+    try {
+      const r = await studentApi.get(path);
+      if (r?.ok === true && Array.isArray(r.data)) {
+        results.push({
+          path,
+          label,
+          ok: true,
+          count: r.data.length,
+          checkedAt: r.meta?.checkedAt ?? null,
+          mode: r.meta?.mode ?? null,
+        });
+      } else {
+        results.push({
+          path,
+          label,
+          ok: false,
+          code: r?.error?.code ?? 'UNKNOWN_ERROR',
+          message: r?.error?.message ?? '서버가 오류 내용을 알려 주지 않았습니다.',
+          mode: r?.meta?.mode ?? null,
+        });
+      }
+    } catch (error) {
+      results.push({
+        path,
+        label,
+        ok: false,
+        code: 'NETWORK_ERROR',
+        message: error && typeof error.message === 'string' && error.message
+          ? error.message
+          : '서버에 연결할 수 없습니다.',
+        mode: null,
+      });
+    }
+  }
+  riskRefresh = { status: 'done', results };
+  notifyChange();
+}
+
+function riskRefreshView() {
+  const loading = riskRefresh.status === 'loading';
+  const box = textNode('div', '', {
+    'data-student-section': 'risk-refresh',
+    ...(loading ? { 'aria-busy': 'true' } : {}),
+  });
+  const button = textNode('button', '다시 조회', {
+    type: 'button',
+    'aria-label': '위험 알림 다시 조회',
+    ...(loading ? { disabled: 'disabled' } : {}),
+  });
+  button.addEventListener('click', () => { void refreshRisk(); });
+  box.append(button);
+
+  const statusText = {
+    idle: '다시 조회를 누르면 기기·세션·보안 기록을 새로 읽고 잰 시각을 보여 줍니다.',
+    loading: '새로 읽는 중…',
+    unavailable: '다시 조회를 쓸 수 없습니다: 조회 도구가 연결되지 않았습니다.',
+    done: `다시 조회 결과: 성공 ${riskRefresh.results.filter(result => result.ok).length}건 · 실패 ${riskRefresh.results.filter(result => !result.ok).length}건`,
+  }[riskRefresh.status] ?? '확인 불가: 다시 조회 상태를 읽을 수 없습니다.';
+  box.append(textNode('p', statusText, { role: 'status', 'aria-live': 'polite' }));
+
+  if (riskRefresh.status === 'done') {
+    for (const result of riskRefresh.results) {
+      if (result.ok) {
+        const demoNotice = result.mode === 'demo' ? ' · 예제 자료(실제 조회 아님)' : '';
+        box.append(textNode('p', `${result.label}: 새로 읽음 · ${result.count}건 · 잰 시각 ${safeValue(result.checkedAt ?? '확인 불가', 40)}${demoNotice}`));
+      } else {
+        box.append(
+          textNode('p', `${result.label}을(를) 읽지 못했습니다: ${safeValue(result.message)} (${safeValue(result.code, 60)})`, { role: 'alert' }),
+          textNode('p', `다음에 할 일: ${nextActionFor(result.code)}`),
+        );
+      }
+    }
+  }
+
+  box.append(textNode('p', '위쪽 위험 알림 목록은 앱 전체를 다시 불러올 때 바뀝니다. 이 결과는 방금 다시 읽은 조회 결과입니다.'));
+  return box;
+}
+
 // 마지막 총공세: 상태 칸 맨 위의 위험 알림 요약(높음·확인 필요). Workbench 작성.
 function riskAlertSection(view) {
   const input = view && typeof view === 'object' ? view : {};
@@ -529,6 +644,7 @@ function renderStatus(input) {
   if (mode !== 'connected') root.append(textNode('p', MODE_NOTICES[mode], { 'data-student-mode': mode }));
   root.append(
     riskAlertSection(view),
+    riskRefreshView(),
     statusSection('기기', 'devices', view.devices, '등록된 기기가 없습니다.', d => line(
       `${present(d.label, present(d.id))} (id: ${present(d.id)})`, codeLabel(DEVICE_LABELS, d.status),
       DEVICE_ATTENTION.has(d.status) || !Object.hasOwn(DEVICE_LABELS, d.status))),
@@ -1162,7 +1278,8 @@ function renderVulnerabilities(input) {
   return root;
 }
 
-export function createStudentView() {
+export function createStudentView(options) {
+  connectStudentRuntime(options);
   return {
     renderIdentity,
     renderDecision,

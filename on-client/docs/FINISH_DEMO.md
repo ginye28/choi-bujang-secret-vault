@@ -49,12 +49,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1 -De
 - **실제 모드에서 화면으로 확인함(2026-10-26 11:00~11:10 기록)**: 연결 없음, 기록 불러오기 실패가 기록 부재를 뜻하지 않는다는 안내, 업무 앱 `ENGINE_NOT_CONNECTED` 및 요청 버튼 0개, 패키지 `not_configured`. 실제 사건 기록·허용/거부 판정·OSV 결과를 조회한 것은 아니다.
 - **설명용 예제**: 예제 기록 1건 `event-01`, 학습 자료실 `allow`, 개발 저장소 `deny`와 시각. 패키지는 `not_configured`. 이 값들은 실제 조회가 아니다. AI `ON_AI_PROVISIONING_PENDING`은 2026-10-23 예제 모드에서 확인된 예제 결과다.
 - **미연결·확인 불가**: 계정 연결·AI 앱 승인 및 실제 사건 설명(게이트 `401 ON_APP_NATIVE_SESSION_UNVERIFIED`), SDP 접근 제어·XDR 실제 연결(설정 없음, 연결 없음), 19단계 실제 조치 집행(미준비), OSV 실제 조회(허용 목록 없음).
-- **시험 기록**: 2026-10-26 11:16 `keshev-final` 폴더에서 `node --test test/on-client/*.test.mjs`를 다시 실행해 46개 통과, 실패 0(Node.js v24.19.0). 모의 DOM 시험이며 실제 연결 시험이 아니다.
+- **시험 기록**: 2026-10-26 11:16 `keshev-final` 폴더에서 `node --test test/on-client/*.test.mjs`를 다시 실행해 46개 통과, 실패 0(Node.js v24.19.0). 모의 DOM 시험이며 실제 연결 시험이 아니다. 2026-10-27 위험 알림·다시 조회·PC 측정 도구 시험을 더해 64개 통과.
 - **새 폴더 재현 기록**: `keshev-final` 브랜치 맨 위 `REPRODUCTION.md`에 22단계 새 폴더 재현(커밋 `c7b69c8`) 기록이 있다. QUICKSTART 안내를 보고 따라 한 기록과 보완 뒤 다시 따라 한 기록은 `on-client/docs/FINISH_NOTES.md`에 있다. 실제로 개인정보를 지운 화면 파일의 경로는 미확인이다.
 
 ## 포장·대시보드 준비 한계
 
 관제 대시보드형과 기본 포장을 선택했지만, 시작 틀 0.2.14에는 `npm run package-app` 명령이 없고 6일차 `npm run package-app -- … --finish-materials` 명령도 없다. 「내 PC 상태」 및 `student/appearance.json` 지원도 준비 대기다. 따라서 실행 패키지 생성·바로가기 생성은 미실시이며, 실행 패키지 경로·`APP_PACKAGE_MANIFEST.json`·`source.git.head`는 미확인이다. 패키지가 만들어졌거나 같은 커밋에서 나왔다고 주장하지 않는다.
+
+## 내 PC 상태와 다시 조회 (2026-10-27 추가)
+
+- 시연 끝에 `on-client` 에서 `node student/pc-status.mjs` 를 실행해 이 PC에서 실제로 잰 CPU·메모리·디스크·네트워크·방화벽·Windows 기록 건수(침해 판정 아님)와 잰 시각을 보여 주고, 작업 관리자 값과 비교한다. SDP 는 따로 「SDP 미연결」로 보인다.
+- 학생 상태 칸의 「다시 조회」를 눌러 실제 모드에서는 실패 항목과 다음에 할 일, 예제 모드에서는 잰 시각과 「예제 자료(실제 조회 아님)」를 보여 준다.
 
 ## 근거 경로와 재현 순서
 
